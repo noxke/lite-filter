@@ -13,6 +13,5 @@
 #define LOG_MSG_SIZE 1000
 
 extern void async_log(int log_level, const char *format, ...);
-extern int log_msg_handler(struct nl_msg_struct *msg);
 
 #endif // __LOG_UTILS_H__

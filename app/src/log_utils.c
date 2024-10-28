@@ -49,10 +49,3 @@ void async_log(int log_level, const char *format, ...) {
 
     va_end(args);
 }
-
-int log_msg_handler(struct nl_msg_struct *msg) {
-    int log_level = *(int *)(NL_MSG_DATA(msg));
-    const char *log_str = (char *)(NL_MSG_DATA(msg))+sizeof(int);
-    async_log(log_level, log_str);
-    return 0;
-}
