@@ -5,26 +5,24 @@
 #include "netlink_msg.h"
 #include "netlink_utils.h"
 #include "log_utils.h"
+#include "filter_rule_utils.h"
 
 #include "module_utils.h"
 
-int log_sender(int log_level, char *s) {
-    struct nl_msg_struct *msg;
-    unsigned int msg_size, s_len;
-    int ret;
-    s_len = strlen(s) + 1;
-    msg_size = s_len+sizeof(int);
-
-    msg = (struct nl_msg_struct *)kmalloc(NL_MSG_SIZE(msg_size), GFP_KERNEL);
-    if (msg == NULL)
-    {
-        return -1;
+int nl_msg_config_handler(struct nl_msg_struct *msg) {
+    void *conf = (void *)NL_MSG_DATA(msg);
+    int config_type = *(int *)conf;
+    switch (config_type) {
+        case CONF_LOG_SET:
+        case CONF_LOG_GET:
+            log_config((LogConfig *)conf);
+            break;
+        case CONF_RULE_CLEAR:
+        case CONF_RULE_INSERT:
+        case CONF_RULE_REMOVE:
+        case CONF_RULE_DUMP:
+            filter_rule_config((RuleConfig *)conf);
+            break;
     }
-    msg->msg_type = NL_MSG_LOG;
-    msg->msg_size = NL_MSG_SIZE(msg_size);
-    *(int *)NL_MSG_DATA(msg) = log_level;
-    memcpy((char *)NL_MSG_DATA(msg)+sizeof(int), s, s_len);
-    ret = nl_send_msg(msg);
-    kfree(msg);
-    return ret;
+    return 0;
 }

@@ -5,21 +5,28 @@
 #include "netlink_utils.h"
 #include "log_utils.h"
 #include "module_utils.h"
+#include "netfilter_hook.h"
 
 static int __init mod_init(void) {
     if (log_utils_init() != 0) {
         goto _log_init;
     }
-    set_log_sender((void *)log_sender);
-    set_log_level(LOG_INFO);
-    set_log_kprint_level(LOG_INFO);
     
     if (netlink_init() != 0) {
         goto _netlink_init;
     }
+
+    if (nf_hook_init() != 0) {
+        goto _nf_hook_init;
+    }
+
+    netlink_set_msg_handler(NL_MSG_CONF, (void *)nl_msg_config_handler);
+
     // 所有模块正常初始化
     goto _all_init;
 
+    nf_hook_exit();
+_nf_hook_init:
     netlink_exit();
 _netlink_init:
     log_utils_exit();
@@ -30,6 +37,7 @@ _all_init:
 }
 
 static void __exit mod_exit(void) {
+    nf_hook_exit();
     netlink_exit();
     log_utils_exit();
 }
