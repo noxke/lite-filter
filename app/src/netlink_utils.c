@@ -74,36 +74,6 @@ void nl_send_ack() {
     nl_send_msg(&msg);
 }
 
-void nl_close_module() {
-    struct nl_msg_struct msg;
-    msg.msg_size = NL_MSG_SIZE(0);
-    msg.msg_type = NL_MSG_CLOSE;
-    nl_send_msg(&msg);
-}
-
-int nl_connect_module() {
-    // 连接内核模块
-    struct nl_msg_struct msg;
-    struct nl_msg_struct *recv_msg;
-    msg.msg_size = NL_MSG_SIZE(0);
-    msg.msg_type = NL_MSG_CONNECT;
-    nl_send_msg(&msg);
-
-    memset(nlmsg_recver_buf.nlh, 0, NLMSG_SPACE(NL_MAX_MSG_SIZE));
-    nlmsg_recver_buf.nlh->nlmsg_len = NLMSG_SPACE(NL_MAX_MSG_SIZE);
-    nlmsg_recver_buf.iov.iov_len = nlmsg_recver_buf.nlh->nlmsg_len;
-
-    if (recvmsg(sk_fd, &nlmsg_recver_buf.msg, 0) < 0) {
-        return -1;
-    }
-    recv_msg = (struct nl_msg_struct *)NLMSG_DATA(nlmsg_recver_buf.nlh);
-
-    if (recv_msg->msg_type != NL_MSG_ACK) {
-        return -1;
-    }
-    return 0;
-}
-
 void netlink_set_msg_handler(NL_MSG_TYPE msg_type, void *handler) {
     if (msg_type >= NL_MSG_RAW && msg_type <= NL_MSG_MAX) {
         nl_msg_handlers[msg_type] = handler;
@@ -175,11 +145,6 @@ int netlink_init(void) {
     nlmsg_recver_buf.msg.msg_iov = &nlmsg_recver_buf.iov;
     nlmsg_recver_buf.msg.msg_iovlen = 1;
 
-    // 连接内核模块
-    if (nl_connect_module() != 0) {
-        goto _connect_init;
-    }
-
     // 初始化消息处理器
     for (i = 0; i < MAX_NL_MSG_TYPE; i++) {
         nl_msg_handlers[i] = nl_msg_handler_default;
@@ -194,7 +159,6 @@ int netlink_init(void) {
 
     goto _all_init;
 
-_connect_init:
 _thread_init:
 _handler_init:
     free(nlmsg_recver_buf.nlh);

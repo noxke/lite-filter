@@ -74,15 +74,10 @@ void nl_recv_msg(struct sk_buff *skb) {
         return;
     }
     if (msg->msg_type >= NL_MSG_RAW && msg->msg_type <= NL_MSG_MAX) {
+        app_pid = nlh->nlmsg_pid;
         switch(msg->msg_type) {
-            case NL_MSG_CONNECT:
-                app_pid = nlh->nlmsg_pid;
+            case NL_MSG_ALIVE:
                 nl_send_ack();
-                async_log(LOG_WARNING, "Netlink connection created, app pid: %d.", app_pid);
-                break;
-            case NL_MSG_CLOSE:
-                app_pid = 0;
-                async_log(LOG_WARNING, "Netlink connection closed.");
                 break;
             default:
                 if (app_pid == nlh->nlmsg_pid) {
