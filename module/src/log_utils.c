@@ -131,10 +131,12 @@ void log_config(LogConfig *conf) {
         msg->msg_type = NL_MSG_CONF;
         msg->msg_size = NL_MSG_SIZE(sizeof(LogConfig));
         msg_conf = (LogConfig *)NL_MSG_DATA(msg);
+        msg_conf->config_type = CONF_LOG_GET;
         msg_conf->log_level = g_log_level;
         msg_conf->log_kprint_level = g_log_kprint_level;
         strncpy(msg_conf->log_file, g_log_file, sizeof(msg_conf->log_file));
         nl_send_msg(msg);
+        kfree(msg);
     }
 }
 
