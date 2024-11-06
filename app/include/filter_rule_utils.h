@@ -14,6 +14,5 @@ int get_interface_address(int ifindex, struct in_addr *addr);
 
 extern int rule_parser(const char *rule_str, RuleConfig *rule);
 extern int rule_format(RuleConfig *rule, char *buf, int buf_size);
-extern int nl_msg_config_handler(struct nl_msg_struct *msg);
 
 #endif // __FILTER_RULE_UTILS_H__

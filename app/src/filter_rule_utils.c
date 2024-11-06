@@ -13,15 +13,6 @@
 #include "log_utils.h"
 #include "filter_rule_utils.h"
 
-/*
-[PREROUTING] -i eth1 -p TCP -s 0.0.0.0/0:1234 -d 0.0.0.0/0:1234 -r ACCEPT
--t PREROUTING -i eth1:eth2 -p TCP -s 0.0.0.0/0:1234 -d 0.0.0.0/0:1234 -r ACCEPT
--t LOCALIN -i :eth1 -p TCP -s 0.0.0.0/0:1234 -d 0.0.0.0/0:1234 -r ACCEPT
--t POSTROUTING -i eth1 -p TCP -s 0.0.0.0/0:1234 -d 0.0.0.0/0:1234 -r SNAT:10.0.0.0:1234
--t PREROUTING -i eth1 -p TCP -s 0.0.0.0/0:1234 -d 0.0.0.0/0:1234 -r DNAT:10.0.0.0:1234
-*/
-
-
 int get_interface_index(const char *if_name) {
     int sock = socket(AF_INET, SOCK_DGRAM, 0);
     if (sock == -1) {
@@ -403,7 +394,7 @@ int rule_parser(const char *rule_str, RuleConfig *rule) {
         ret = -1;
     }
     if (ret != 0) {
-        async_log(LOG_ERROR, "invalid rule: %s", rule_str);
+        lf_log(LOG_ERROR, "invalid rule: %s", rule_str);
     }
     return ret;
 }
@@ -547,8 +538,4 @@ int rule_format(RuleConfig *rule, char *buf, int buf_size) {
         default:
             return -1;
     }
-}
-
-int nl_msg_config_handler(struct nl_msg_struct *msg) {
-    return 0;
 }
