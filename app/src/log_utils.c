@@ -49,3 +49,25 @@ void async_log(int log_level, const char *format, ...) {
 
     va_end(args);
 }
+
+// 普通日志接口
+void lf_log(int log_level, const char *format, ...) {
+    struct LogMessage *message;
+    va_list args;
+
+    message = (struct LogMessage *)malloc(sizeof(struct LogMessage));
+    if (message == NULL)
+    {
+        return;
+    }
+
+    message->log_level = log_level;
+
+    va_start(args, format);
+
+    vsnprintf(message->log_buffer, LOG_MSG_SIZE, format, args);
+
+    printf("%s\n", message->log_buffer);
+
+    va_end(args);
+}
