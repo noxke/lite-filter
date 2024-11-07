@@ -30,6 +30,7 @@ enum {
 };
 
 static int cmd = 0;
+static int hook_chain = 0;
 static int rule_idx = 0;
 static char cmd_buffer[BUFFER_SIZE];
 
@@ -52,19 +53,21 @@ void help() {
     puts("  stop\n\tremove module");
     puts("  load [-f /path/to/rule]\n\tload rules from rule file, default stdin");
     puts("  save [-f /path/to/rule]\n\tsave rules to file, default stdout");
-    puts("  clear\n\tclear rules");
     puts("  log\n\tshow lite-filter logs");
 
-    puts("ls|add|del");
+    puts("ls|add|del|clear");
     // ls
-    puts("  ls -t PREROUTING|LOCALIN|FORWARD|LOCALOUT|POSTROUTING");
+    puts("  ls -t PREROUTING|LOCALIN|FORWARD|LOCALOUT|POSTROUTING|NAT");
     puts("\tlist rules in chain");
     // add
-    puts("  add [-idx 1] -t PREROUTING|LOCALIN|FORWARD|LOCALOUT|POSTROUTING RULE");
+    puts("  add [-idx 1] -t PREROUTING|LOCALIN|FORWARD|LOCALOUT|POSTROUTING|NAT RULE");
     puts("\tinsert rule to chain, idx=0 insert to head, idx=-1 insert to end, default 0");
     // del
-    puts("  del [-idx 1] -t PREROUTING|LOCALIN|FORWARD|LOCALOUT|POSTROUTING");
+    puts("  del [-idx 1] -t PREROUTING|LOCALIN|FORWARD|LOCALOUT|POSTROUTING|NAT");
     puts("\tdelete rule from chain, idx=0 delete from head, idx=-1 delete from end, default -1");
+    // clear
+    puts("  clear -t PREROUTING|LOCALIN|FORWARD|LOCALOUT|POSTROUTING|NAT");
+    puts("\tclear rules in chain");
 
     puts("Rule:");
     puts("  -i [indev][:outdev]");
@@ -75,9 +78,9 @@ void help() {
 
     puts("SNAT|DNAT:");
     puts("  -r SNAT[:10.0.0.1[:1234]]");
-    puts("\tSNAT is only available in POSTROUTING, outdev is must");
+    puts("\tSNAT is only available in NAT, outdev is must");
     puts("  -r DNAT[:10.0.0.1[:1234]]");
-    puts("\tDNAT is only available in PREROUTING, indev is must");
+    puts("\tDNAT is only available in NAT, indev is must");
     exit(0);
 }
 
@@ -120,79 +123,157 @@ int arg_parser(int argc, char *argv[]) {
             strncpy(cmd_buffer, argv[3], sizeof(cmd_buffer));
         }
     }
-    else if (strcmp(argv[1], "clear") == 0) {
-        cmd = CMD_CLEAR;
-    }
     else if (strcmp(argv[1], "log") == 0) {
         cmd = CMD_LOG;
     }
     else if (strcmp(argv[1], "ls") == 0) {
         cmd = CMD_CLI_LS;
-        if (argc >= 4 && strcmp(argv[2], "-t") == 0) {
-            char *buf_p = cmd_buffer;
-            for (int i = 2; i < argc; i++) {
-                strncpy(buf_p, argv[i], sizeof(cmd_buffer)-(cmd_buffer-buf_p));
-                buf_p += strlen(buf_p);
-                *buf_p = ' ';
-                buf_p++;
-            }
+        char *token = argv[3];
+        if (argc < 4 || strcmp(argv[2], "-t") != 0) {
+            return -1;
         }
-        else
-        {
+        if (strcmp(token, "PREROUTING") == 0) {
+            hook_chain = NF_HOOK_PREROUTING;
+        }
+        else if (strcmp(token, "LOCALIN") == 0) {
+            hook_chain = NF_HOOK_LOCALIN;
+        }
+        else if (strcmp(token, "FORWARD") == 0) {
+            hook_chain = NF_HOOK_FORWARD;
+        }
+        else if (strcmp(token, "LOCALOUT") == 0) {
+            hook_chain = NF_HOOK_LOCALOUT;
+        }
+        else if (strcmp(token, "POSTROUTING") == 0) {
+            hook_chain = NF_HOOK_POSTROUTING;
+        }
+        else if (strcmp(token, "NAT") == 0) {
+            hook_chain = NF_HOOK_NAT;
+        }
+        else {
             return -1;
         }
     }
     else if (strcmp(argv[1], "add") == 0) {
         cmd = CMD_CLI_ADD;
+        int argi;
+        char *token = argv[3];
         if (argc >= 4 && strcmp(argv[2], "-idx") == 0) {
             if (sscanf(argv[3], "%d", &rule_idx) != 1) {
                 return -1;
             }
-            char *buf_p = cmd_buffer;
-            for (int i = 4; i < argc; i++) {
-                strncpy(buf_p, argv[i], sizeof(cmd_buffer)-(cmd_buffer-buf_p));
-                buf_p += strlen(buf_p);
-                *buf_p = ' ';
-                buf_p++;
+            if (argc < 6 || strcmp(argv[4], "-t") != 0) {
+                return -1;
             }
+            token = argv[5];
+            argi = 4;
         }
-        else
-        {
+        else if (argc < 4 || strcmp(argv[2], "-t") != 0) {
+            return -1;
+        }
+        else {
             rule_idx = 0;
-            char *buf_p = cmd_buffer;
-            for (int i = 2; i < argc; i++) {
-                strncpy(buf_p, argv[i], sizeof(cmd_buffer)-(cmd_buffer-buf_p));
-                buf_p += strlen(buf_p);
-                *buf_p = ' ';
-                buf_p++;
-            }
+            argi = 2;
+        }
+        if (strcmp(token, "PREROUTING") == 0) {
+            hook_chain = NF_HOOK_PREROUTING;
+        }
+        else if (strcmp(token, "LOCALIN") == 0) {
+            hook_chain = NF_HOOK_LOCALIN;
+        }
+        else if (strcmp(token, "FORWARD") == 0) {
+            hook_chain = NF_HOOK_FORWARD;
+        }
+        else if (strcmp(token, "LOCALOUT") == 0) {
+            hook_chain = NF_HOOK_LOCALOUT;
+        }
+        else if (strcmp(token, "POSTROUTING") == 0) {
+            hook_chain = NF_HOOK_POSTROUTING;
+        }
+        else if (strcmp(token, "NAT") == 0) {
+            hook_chain = NF_HOOK_NAT;
+        }
+        else {
+            return -1;
+        }
+        char *buf_p = cmd_buffer;
+        for (int i = argi; i < argc; i++) {
+            strncpy(buf_p, argv[i], sizeof(cmd_buffer)-(cmd_buffer-buf_p));
+            buf_p += strlen(buf_p);
+            *buf_p = ' ';
+            buf_p++;
         }
     }
     else if (strcmp(argv[1], "del") == 0) {
         cmd = CMD_CLI_DEL;
+        char *token = argv[3];
         if (argc >= 4 && strcmp(argv[2], "-idx") == 0) {
             if (sscanf(argv[3], "%d", &rule_idx) != 1) {
                 return -1;
             }
-            char *buf_p = cmd_buffer;
-            for (int i = 4; i < argc; i++) {
-                strncpy(buf_p, argv[i], sizeof(cmd_buffer)-(cmd_buffer-buf_p));
-                buf_p += strlen(buf_p);
-                *buf_p = ' ';
-                buf_p++;
+            if (argc < 6 || strcmp(argv[4], "-t") != 0) {
+                return -1;
             }
+            token = argv[5];
         }
-        else
-        {
+        else if (argc < 4 || strcmp(argv[2], "-t") != 0) {
+            return -1;
+        }
+        else {
             rule_idx = 0;
-            char *buf_p = cmd_buffer;
-            for (int i = 2; i < argc; i++) {
-                strncpy(buf_p, argv[i], sizeof(cmd_buffer)-(cmd_buffer-buf_p));
-                buf_p += strlen(buf_p);
-                *buf_p = ' ';
-                buf_p++;
-            }
         }
+        if (strcmp(token, "PREROUTING") == 0) {
+            hook_chain = NF_HOOK_PREROUTING;
+        }
+        else if (strcmp(token, "LOCALIN") == 0) {
+            hook_chain = NF_HOOK_LOCALIN;
+        }
+        else if (strcmp(token, "FORWARD") == 0) {
+            hook_chain = NF_HOOK_FORWARD;
+        }
+        else if (strcmp(token, "LOCALOUT") == 0) {
+            hook_chain = NF_HOOK_LOCALOUT;
+        }
+        else if (strcmp(token, "POSTROUTING") == 0) {
+            hook_chain = NF_HOOK_POSTROUTING;
+        }
+        else if (strcmp(token, "NAT") == 0) {
+            hook_chain = NF_HOOK_NAT;
+        }
+        else {
+            return -1;
+        }
+    }
+    else if (strcmp(argv[1], "clear") == 0) {
+        cmd = CMD_CLEAR;
+        char *token = argv[3];
+        if (argc < 4 || strcmp(argv[2], "-t") != 0) {
+            return -1;
+        }
+        if (strcmp(token, "PREROUTING") == 0) {
+            hook_chain = NF_HOOK_PREROUTING;
+        }
+        else if (strcmp(token, "LOCALIN") == 0) {
+            hook_chain = NF_HOOK_LOCALIN;
+        }
+        else if (strcmp(token, "FORWARD") == 0) {
+            hook_chain = NF_HOOK_FORWARD;
+        }
+        else if (strcmp(token, "LOCALOUT") == 0) {
+            hook_chain = NF_HOOK_LOCALOUT;
+        }
+        else if (strcmp(token, "POSTROUTING") == 0) {
+            hook_chain = NF_HOOK_POSTROUTING;
+        }
+        else if (strcmp(token, "NAT") == 0) {
+            hook_chain = NF_HOOK_NAT;
+        }
+        else {
+            return -1;
+        }
+    }
+    else {
+        return -1;
     }
     return 0;
 }
@@ -287,6 +368,66 @@ int conf_parser(const char *conf_file) {
     return 0;
 }
 
+int cmd_load() {
+    RuleConfig conf;
+    char line_buf[BUFFER_SIZE];
+    FILE *fp;
+    int ret = 0;
+    if (strlen(cmd_buffer) == 0) {
+        fp = stdin;
+    }
+    else {
+        fp = fopen(cmd_buffer, "rt");
+    }
+    if (fp == NULL) {
+        printf("Invalid rule file: %s\n", cmd_buffer);
+        return -1;
+    }
+    while (fgets(line_buf, sizeof(line_buf), fp) != NULL) {
+        memset(&conf, 0, sizeof(conf));
+        if (rule_parser(line_buf, &conf) != 0 || rule_format(&conf, conf.rule_str, sizeof(conf.rule_str)) != 0) {
+            ret = -1;
+            break;
+        }
+        // 默认往末尾插入
+        if (config_rule_insert(&conf, -1) != 0) {
+            ret = -1;
+            break;
+        }
+    }
+    if (fp != stdin) {
+        fclose(fp);
+    }
+    return ret;
+}
+
+int cmd_save() {
+    FILE *fp;
+    int ret = 0;
+    if (strlen(cmd_buffer) == 0) {
+        fp = stdout;
+    }
+    else {
+        fp = fopen(cmd_buffer, "wt");
+    }
+    if (fp == NULL) {
+        printf("Invalid rule file: %s\n", cmd_buffer);
+        return -1;
+    }
+
+    for (int i = NF_HOOK_NONE+1; i < NF_HOOK_MAX; i++) {
+        if (config_rule_dump(i, fp) != 0) {
+            ret = -1;
+            break;
+        }
+    }
+    
+    if (fp != stdout) {
+        fclose(fp);
+    }
+    return ret;
+}
+
 int cmd_start() {
     LogConfig conf;
     memset(&conf, 0, sizeof(conf));
@@ -294,7 +435,14 @@ int cmd_start() {
     conf.log_level = config.log_level;
     conf.log_kprint_level = config.log_kprint_level;
     strncpy(conf.log_file, config.log_file, sizeof(conf.log_file));
-    return config_log_set(&conf);
+    if (config_log_set(&conf) != 0) {
+        return -1;
+    }
+    if (strlen(config.rule_file) != 0) {
+        strncpy(cmd_buffer, config.rule_file, sizeof(cmd_buffer));
+        return cmd_load();
+    }
+    return 0;
 }
 
 int cmd_log() {
@@ -315,6 +463,26 @@ int cmd_log() {
     }
     fclose(fp);
     return 0;
+}
+
+int cmd_ls() {
+    return config_rule_dump(hook_chain, stdout);
+}
+
+int cmd_add() {
+    RuleConfig conf;
+    if (rule_parser(cmd_buffer, &conf) != 0) {
+        return -1;
+    }
+    return config_rule_insert(&conf, rule_idx);
+}
+
+int cmd_del() {
+    return config_rule_remove(hook_chain, rule_idx);
+}
+
+int cmd_clear() {
+    return config_rule_clear(hook_chain);
 }
 
 int service_init() {
@@ -364,19 +532,25 @@ int service_main() {
             return 0;
             break;
         case CMD_LOAD:
+            ret = cmd_load();
             break;
         case CMD_SAVE:
-            break;
-        case CMD_CLEAR:
+            ret = cmd_save();
             break;
         case CMD_LOG:
             ret = cmd_log();
             break;
         case CMD_CLI_LS:
+            ret = cmd_ls();
             break;
         case CMD_CLI_ADD:
+            ret = cmd_add();
             break;
         case CMD_CLI_DEL:
+            ret = cmd_del();
+            break;
+        case CMD_CLEAR:
+            ret = cmd_clear();
             break;
         default:
             ret = -1;
@@ -395,6 +569,9 @@ int main(int argc, char *argv[], char *envp[]) {
         puts("lite-filter: Invalid usage");
         return -1;
     }
-    service_main();
+    if (service_main() != 0) {
+        puts("lite-filter: Internal Error");
+        return -1;
+    }
     return 0;
 }

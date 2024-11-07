@@ -91,15 +91,22 @@ int get_interface_address(int ifindex, struct in_addr *addr) {
 
 int rule_parser(const char *rule_str, RuleConfig *rule) {
     int ret  = 0;
+    int only_chain = 1;
     char *token;
     char *tmp_token;
     char str[MAX_RULE_STR_SIZE];
     char tmp_str[MAX_RULE_STR_SIZE];
-    if (rule == NULL) {
+    if (rule == NULL || rule_str == NULL || strlen(rule_str) <= 0) {
         return -1;
     }
     memset(rule, 0, sizeof(RuleConfig));
     strncpy(str, rule_str, sizeof(str));
+    // strip
+    token = str + strlen(str) - 1;
+    while ((token >= str) && (*token == '\n' || *token == ' ' || *token == '\t')) {
+        *token = '\0';
+        token--;
+    }
     token = strtok(str, " ");
     do {
         if (token[0] == '[' || strcmp(token, "-t") == 0) {
@@ -124,12 +131,18 @@ int rule_parser(const char *rule_str, RuleConfig *rule) {
             }
             else if (strcmp(token, "POSTROUTING") == 0) {
                 rule->hook_chain = NF_HOOK_POSTROUTING;
+            }
+            else if (strcmp(token, "NAT") == 0) {
+                rule->hook_chain = NF_HOOK_NAT;
             } else {
                 ret = -1;
                 break;
             }
         }
-        else if (strcmp(token, "-i") == 0) {
+        else {
+            only_chain = 0;
+        }
+        if (strcmp(token, "-i") == 0) {
             token = strtok(NULL, " ");
             if (token == NULL) {
                 ret = -1;
@@ -325,7 +338,7 @@ int rule_parser(const char *rule_str, RuleConfig *rule) {
                     rule->rule.natport = htons(port);
                 }
             }
-            else if (strcmp(tmp_str, "DNAT")) {
+            else if (strcmp(tmp_str, "DNAT") == 0) {
                 rule->rule.rule_type = FILTER_DNAT;
                 char *tmp = tmp_token;
                 tmp_token;
@@ -369,8 +382,8 @@ int rule_parser(const char *rule_str, RuleConfig *rule) {
     }
     // SNAT
     if (rule->rule.rule_type == FILTER_SNAT) {
-        // POSTROUTING链
-        if (rule->hook_chain != NF_HOOK_POSTROUTING) {
+        // NAT链
+        if (rule->hook_chain != NF_HOOK_NAT) {
             ret = -1;
         }
         // 需要outdev
@@ -380,8 +393,8 @@ int rule_parser(const char *rule_str, RuleConfig *rule) {
     }
     // DNAT
     if (rule->rule.rule_type == FILTER_DNAT) {
-        // PREROUTING链
-        if (rule->hook_chain != NF_HOOK_PREROUTING) {
+        // NAT链
+        if (rule->hook_chain != NF_HOOK_NAT) {
             ret = -1;
         }
         // 需要indev
@@ -390,7 +403,7 @@ int rule_parser(const char *rule_str, RuleConfig *rule) {
         }
     }
     // 规则类型
-    if (rule->rule.rule_type <= FILTER_NONE || rule->rule.rule_type >=FILTER_MAX ) {
+    if ((only_chain == 0) && (rule->rule.rule_type <= FILTER_NONE || rule->rule.rule_type >=FILTER_MAX)) {
         ret = -1;
     }
     if (ret != 0) {
@@ -423,6 +436,9 @@ int rule_format(RuleConfig *rule, char *buf, int buf_size) {
             break;
         case NF_HOOK_POSTROUTING:
             snprintf(buf_p, (buf_size-(buf_p-buf)), "[POSTROUTING] ");
+            break;
+        case NF_HOOK_NAT:
+            snprintf(buf_p, (buf_size-(buf_p-buf)), "[NAT] ");
             break;
     }
     buf_p += strlen(buf_p);
@@ -538,4 +554,5 @@ int rule_format(RuleConfig *rule, char *buf, int buf_size) {
         default:
             return -1;
     }
+    return 0;
 }
