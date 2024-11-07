@@ -7,11 +7,14 @@
 typedef unsigned char u8;
 
 enum NL_HOOK_CHAIN {
-    NF_HOOK_PREROUTING = 0,
-    NF_HOOK_LOCALIN = 1,
-    NF_HOOK_FORWARD = 2,
-    NF_HOOK_LOCALOUT = 3,
-    NF_HOOK_POSTROUTING = 4,
+    NF_HOOK_NONE = 0,
+    NF_HOOK_PREROUTING = 1,
+    NF_HOOK_LOCALIN = 2,
+    NF_HOOK_FORWARD = 3,
+    NF_HOOK_LOCALOUT = 4,
+    NF_HOOK_POSTROUTING = 5,
+    NF_HOOK_NAT = 6,
+    NF_HOOK_MAX = 7,
 };
 
 enum FILTER_MATCH_FLAGS {
@@ -69,6 +72,7 @@ typedef struct {
     int hook_chain;
     int index;
     FilterRuleV4 rule;
+    char rule_str[MAX_RULE_STR_SIZE];
 }RuleConfig;
 
 
