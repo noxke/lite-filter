@@ -107,13 +107,13 @@ int netlink_init(void) {
     for (i = 0; i < MAX_NL_MSG_TYPE; i++) {
         nl_msg_handlers[i] = nl_msg_handler_default;
     }
-    async_log(LOG_INFO, "Create netlink socket.");
+    async_log(LOG_WARNING, "Create netlink socket.");
     return 0;
 }
 
 void netlink_exit(void) {
     if (nl_sk != NULL) {
         netlink_kernel_release(nl_sk);
-        async_log(LOG_INFO, "Close, netlink socket.");
+        async_log(LOG_WARNING, "Close, netlink socket.");
     }
 }
