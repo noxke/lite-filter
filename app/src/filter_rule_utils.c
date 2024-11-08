@@ -465,7 +465,7 @@ int rule_format(RuleConfig *rule, char *buf, int buf_size) {
         buf_p += strlen(buf_p);
     }
     // 协议
-    if ((rule->rule.match_flags | FILTER_MATCH_PROTO) != 0) {
+    if ((rule->rule.match_flags & FILTER_MATCH_PROTO) != 0) {
         switch (rule->rule.protocol) {
             case IPPROTO_ICMP:
                 snprintf(buf_p, (buf_size-(buf_p-buf)), "-p ICMP ");
