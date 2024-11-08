@@ -34,5 +34,5 @@ int config_log_get(LogConfig *conf);
 int config_rule_clear(int hook_chain);
 int config_rule_insert(RuleConfig *conf, int index);
 int config_rule_remove(int hook_chain, int index);
-int config_rule_dump(int hook_chain, FILE *fp);
+int config_rule_dump(int hook_chain, FILE *fp, int with_index);
 #endif // __CONF_UTILS_H__

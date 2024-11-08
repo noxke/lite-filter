@@ -199,7 +199,7 @@ int config_rule_remove(int hook_chain, int index) {
     return ret;
 }
 
-int config_rule_dump(int hook_chain, FILE *fp) {
+int config_rule_dump(int hook_chain, FILE *fp, int with_index) {
     RuleConfig conf;
     struct nl_msg_struct *msg;
     int ret = 0;
@@ -241,15 +241,14 @@ int config_rule_dump(int hook_chain, FILE *fp) {
     pthread_cond_signal(&config_handler_cond);
     pthread_mutex_unlock(&(config_rule_dump_mutex_cond.mutex));
 
-    index = conf.index;
-    if (index < 0) {
+    if (conf.index < 0) {
         ret = -1;
     }
     dump_fp = fopen(tmpfile, "rb");
     if (dump_fp == NULL) {
         ret = -1;
     }
-    while (ret != -1 && index > 0) {
+    while (ret != -1 && index < conf.index) {
         if (fread(&(conf.rule), sizeof(conf.rule), 1, dump_fp) != 1) {
             ret = -1;
             break;
@@ -258,8 +257,13 @@ int config_rule_dump(int hook_chain, FILE *fp) {
             ret = -1;
             break;
         }
+        // 输出行号
+        if (with_index == 1) {
+            fprintf(fp, "[%d] ", index);
+        }
+        // 输出规则
         fprintf(fp, "%s\n", conf.rule_str);
-        index--;
+        index++;
     }
 
     if (dump_fp != NULL) {

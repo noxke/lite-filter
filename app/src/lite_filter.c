@@ -426,7 +426,7 @@ int cmd_save() {
     }
 
     for (int i = NF_HOOK_NONE+1; i < NF_HOOK_MAX; i++) {
-        if (config_rule_dump(i, fp) != 0) {
+        if (config_rule_dump(i, fp, 0) != 0) {
             ret = -1;
             break;
         }
@@ -476,7 +476,7 @@ int cmd_log() {
 }
 
 int cmd_ls() {
-    return config_rule_dump(hook_chain, stdout);
+    return config_rule_dump(hook_chain, stdout, 1);
 }
 
 int cmd_add() {
