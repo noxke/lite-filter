@@ -45,15 +45,27 @@ void get_ip_pack_info_v4(struct sk_buff *skb, IpPackInfoV4 *info) {
     }
 }
 
-FilterRuleV4 *filter_rule_match_v4(FilterNodeV4 *rule_link, IpPackInfoV4 *info) {
-    FilterRuleV4 *rule;
+int addr4_amtch(__be32 a1, __be32 a2, u8 prefixlen) {
+    if (prefixlen == 0) {
+        return 0;
+    }
+    if (((a1 ^ a2) & htonl(~0UL << (32 - prefixlen))) == 0) {
+        return 0;
+    }
+    return -1;
+}
+
+RuleConfig *filter_rule_match_v4(FilterNodeV4 *rule_link, IpPackInfoV4 *info) {
     FilterNodeV4 *rule_next;
+    RuleConfig *rule_conf;
+    FilterRuleV4 *rule;
     if (rule_link == NULL || info == NULL) {
         return NULL;
     }
     rule_next = rule_link;
     while (rule_next != NULL) {
-        rule = &(rule_next->rule);
+        rule_conf = &(rule_next->rule_conf);
+        rule = &(rule_conf->rule);
         rule_next = rule_next->next;
         if (((rule->match_flags & FILTER_MATCH_INDEV) != 0) && (rule->indev != info->indev)) {
             continue;
@@ -64,10 +76,10 @@ FilterRuleV4 *filter_rule_match_v4(FilterNodeV4 *rule_link, IpPackInfoV4 *info) 
         if (((rule->match_flags & FILTER_MATCH_PROTO) != 0) && (rule->protocol != info->protocol)) {
             continue;
         }
-        if (((rule->match_flags & FILTER_MATCH_SADDR) != 0) && addr4_amtch(rule->saddr, info->saddr, rule->sprefixlen)) {
+        if (((rule->match_flags & FILTER_MATCH_SADDR) != 0) && addr4_amtch(rule->saddr, info->saddr, rule->sprefixlen) != 0) {
             continue;
         }
-        if (((rule->match_flags & FILTER_MATCH_DADDR) != 0) && addr4_amtch(rule->daddr, info->daddr, rule->dprefixlen)) {
+        if (((rule->match_flags & FILTER_MATCH_DADDR) != 0) && addr4_amtch(rule->daddr, info->daddr, rule->dprefixlen) != 0) {
             continue;
         }
         if (((rule->match_flags & FILTER_MATCH_SPORT) != 0) && (rule->sport != info->sport)) {
@@ -76,24 +88,28 @@ FilterRuleV4 *filter_rule_match_v4(FilterNodeV4 *rule_link, IpPackInfoV4 *info) 
         if (((rule->match_flags & FILTER_MATCH_DPORT) != 0) && (rule->dport != info->dport)) {
             continue;
         }
-        return rule;
+        return rule_conf;
     }
     return NULL;
 }
 
-FilterNodeV4 *filter_rule_insert_v4(FilterNodeV4 *rule_link, int index, FilterRuleV4 *rule) {
+void filter_rule_matched_log(RuleConfig *matched_rule, IpPackInfoV4 *info) {
+
+}
+
+FilterNodeV4 *filter_rule_insert_v4(FilterNodeV4 *rule_link, int index, RuleConfig *conf) {
     FilterNodeV4 *prev;
     FilterNodeV4 *next;
     FilterNodeV4 *new_node;
     int idx;
-    if (rule == NULL) {
+    if (conf == NULL) {
         return rule_link;
     }
     new_node = (FilterNodeV4 *)kmalloc(sizeof(FilterNodeV4), GFP_KERNEL);
     if (new_node == NULL) {
         return rule_link;
     }
-    memcpy(&(new_node->rule), rule, sizeof(FilterRuleV4));
+    memcpy(&(new_node->rule_conf), conf, sizeof(new_node->rule_conf));
     prev = NULL;
     next = rule_link;
     idx = 0;
@@ -175,7 +191,7 @@ void filter_rule_dump_v4(FilterNodeV4 *rule_link, int hook_chain, const char *tm
     msg_conf->hook_chain = hook_chain;
     while (next != NULL) {
         msg_conf->index = idx;
-        kernel_write(fp, &(next->rule), sizeof(FilterRuleV4), &fp->f_pos);
+        kernel_write(fp, &(next->rule_conf.rule), sizeof(FilterRuleV4), &fp->f_pos);
         next = next->next;
         idx += 1;
     }
@@ -189,7 +205,6 @@ void filter_rule_dump_v4(FilterNodeV4 *rule_link, int hook_chain, const char *tm
 
 void filter_rule_config(RuleConfig *conf) {
     int index;
-    FilterRuleV4 *rule;
     FilterNodeV4 *rule_link;
     const char *chain_name;
     struct mutex *chain_mutex;
@@ -197,7 +212,6 @@ void filter_rule_config(RuleConfig *conf) {
         return;
     }
     index = conf->index;
-    rule = &(conf->rule);
     rule_link = nf_hook_table[conf->hook_chain].rule_link;
     chain_name = nf_hook_table[conf->hook_chain].chain_name;
     chain_mutex = &(nf_hook_table[conf->hook_chain].chain_mutex);
@@ -210,7 +224,7 @@ void filter_rule_config(RuleConfig *conf) {
             break;
         case CONF_RULE_INSERT:
             async_log(LOG_WARNING, "Insert rule to %s idx=%d: %s", chain_name, index, conf->rule_str);
-            rule_link = filter_rule_insert_v4(rule_link, index, rule);
+            rule_link = filter_rule_insert_v4(rule_link, index, conf);
             nf_hook_table[conf->hook_chain].rule_link = rule_link;
             break;
         case CONF_RULE_REMOVE:
