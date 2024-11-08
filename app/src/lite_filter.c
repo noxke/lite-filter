@@ -298,7 +298,7 @@ int conf_parser(const char *conf_file) {
             key_p++;
         }
         // 去除注释行
-        if (strlen(key_p) == 0 || *key_p == '#') {
+        if (strlen(key_p) == 0 || *key_p == '#' || *key_p == '\n') {
             continue;
         }
         value_p = key_p;
@@ -371,6 +371,7 @@ int conf_parser(const char *conf_file) {
 int cmd_load() {
     RuleConfig conf;
     char line_buf[BUFFER_SIZE];
+    char *token;
     FILE *fp;
     int ret = 0;
     if (strlen(cmd_buffer) == 0) {
@@ -384,8 +385,17 @@ int cmd_load() {
         return -1;
     }
     while (fgets(line_buf, sizeof(line_buf), fp) != NULL) {
+        token = line_buf;
+        // 去除前缀空白字符
+        while ((strlen(token) > 0) && (*token == ' ' || *token == '\t')) {
+            token++;
+        }
+        // 去除注释行
+        if (strlen(token) == 0 || *token == '#' || *token == '\n') {
+            continue;
+        }
         memset(&conf, 0, sizeof(conf));
-        if (rule_parser(line_buf, &conf) != 0 || rule_format(&conf, conf.rule_str, sizeof(conf.rule_str)) != 0) {
+        if (rule_parser(token, &conf) != 0 || rule_format(&conf, conf.rule_str, sizeof(conf.rule_str)) != 0) {
             ret = -1;
             break;
         }
@@ -525,6 +535,11 @@ int service_main() {
     switch (cmd) {
         case CMD_START:
             ret = cmd_start();
+            if (ret != 0) {
+                service_exit();
+                system("rmmod lite_filter");
+                return -1;
+            }
             break;
         case CMD_STOP:
             service_exit();
