@@ -62,11 +62,6 @@ typedef struct {
     __be16 natport;
 } FilterRuleV4;
 
-typedef struct _FilterNodeV4 {
-    FilterRuleV4 rule;
-    struct _FilterNodeV4 *next;
-} FilterNodeV4;
-
 typedef struct {
     int config_type;
     int hook_chain;
@@ -75,5 +70,9 @@ typedef struct {
     char rule_str[MAX_RULE_STR_SIZE];
 }RuleConfig;
 
+typedef struct _FilterNodeV4 {
+    RuleConfig rule_conf;
+    struct _FilterNodeV4 *next;
+} FilterNodeV4;
 
 #endif // __FILTER_RULE_H__
