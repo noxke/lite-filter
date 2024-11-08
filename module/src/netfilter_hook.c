@@ -13,16 +13,38 @@
 
 // Hook function for PREROUTING chain
 unsigned int hook_prerouting_func(void *priv, struct sk_buff *skb, const struct nf_hook_state *state) {
-    struct iphdr *iph;
     struct net_device *indev = state->in;
     struct net_device *outdev = state->out;
+    IpPackInfoV4 info;
+    RuleConfig *matched_rule;
+
+    memset(&info, 0, sizeof(info));
+    // 解析ip数据包信息
+    get_ip_pack_info_v4(skb, &info);
+    if (indev != 0) {
+        info.indev = indev->ifindex;
+    }
+    else {
+        info.indev = -1;
+    }
+    if (outdev != 0) {
+        info.outdev = outdev->ifindex;
+    }
+    else {
+        info.outdev = -1;
+    }
     
+    // 匹配PREROUTING链表
+    matched_rule = filter_rule_match_v4(nf_hook_table[NF_HOOK_PREROUTING].rule_link, &info);
+    if (matched_rule != NULL && matched_rule->rule.match_flags != 0) {
+        filter_rule_matched_log(matched_rule, &info);
+    }
+
     return NF_ACCEPT;
 }
 
 // Hook function for INPUT chain
 unsigned int hook_input_func(void *priv, struct sk_buff *skb, const struct nf_hook_state *state) {
-    struct iphdr *iph;
     struct net_device *indev = state->in;
     struct net_device *outdev = state->out;
 
@@ -31,7 +53,6 @@ unsigned int hook_input_func(void *priv, struct sk_buff *skb, const struct nf_ho
 
 // Hook function for FORWARD chain
 unsigned int hook_forward_func(void *priv, struct sk_buff *skb, const struct nf_hook_state *state) {
-    struct iphdr *iph;
     struct net_device *indev = state->in;
     struct net_device *outdev = state->out;
 
@@ -40,7 +61,6 @@ unsigned int hook_forward_func(void *priv, struct sk_buff *skb, const struct nf_
 
 // Hook function for OUTPUT chain
 unsigned int hook_output_func(void *priv, struct sk_buff *skb, const struct nf_hook_state *state) {
-    struct iphdr *iph;
     struct net_device *indev = state->in;
     struct net_device *outdev = state->out;
 
@@ -49,7 +69,6 @@ unsigned int hook_output_func(void *priv, struct sk_buff *skb, const struct nf_h
 
 // Hook function for POSTROUTING chain
 unsigned int hook_postrouting_func(void *priv, struct sk_buff *skb, const struct nf_hook_state *state) {
-    struct iphdr *iph;
     struct net_device *indev = state->in;
     struct net_device *outdev = state->out;
 
