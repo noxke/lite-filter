@@ -53,7 +53,7 @@ void help() {
     puts("  stop\n\tremove module");
     puts("  load [-f /path/to/rule]\n\tload rules from rule file, default stdin");
     puts("  save [-f /path/to/rule]\n\tsave rules to file, default stdout");
-    puts("  log\n\tshow lite-filter logs");
+    puts("  log [patterns]\n\tshow lite-filter logs");
 
     puts("ls|add|del|clear");
     // ls
@@ -125,6 +125,13 @@ int arg_parser(int argc, char *argv[]) {
     }
     else if (strcmp(argv[1], "log") == 0) {
         cmd = CMD_LOG;
+        char *buf_p = cmd_buffer;
+        for (int i = 2; i < argc; i++) {
+            strncpy(buf_p, argv[i], sizeof(cmd_buffer)-(cmd_buffer-buf_p));
+            buf_p += strlen(buf_p);
+            *buf_p = ' ';
+            buf_p++;
+        }
     }
     else if (strcmp(argv[1], "ls") == 0) {
         cmd = CMD_CLI_LS;
@@ -362,7 +369,7 @@ int conf_parser(const char *conf_file) {
         }
     }
     fclose(fp);
-    if (access(config.module_file, R_OK) != 0) {
+    if (access(config.module_file, F_OK) != 0) {
         return -1;
     }
     return 0;
@@ -442,6 +449,18 @@ int cmd_start() {
     LogConfig conf;
     memset(&conf, 0, sizeof(conf));
     conf.config_type = CONF_LOG_SET;
+    // 日志配置
+    // 若日志文件已存在，重命名为.old
+    char old_logfile[MAX_PATH+8];
+    snprintf(old_logfile, sizeof(old_logfile), "%s.old", config.log_file);
+    if (access(config.log_file, F_OK) == 0) {
+        if (access(old_logfile, F_OK) == 0) {
+            unlink(old_logfile);
+        }
+        if (rename(config.log_file, old_logfile) != 0) {
+            return -1;
+        }
+    }
     conf.log_level = config.log_level;
     conf.log_kprint_level = config.log_kprint_level;
     strncpy(conf.log_file, config.log_file, sizeof(conf.log_file));
@@ -459,6 +478,8 @@ int cmd_log() {
     LogConfig conf;
     FILE *fp;
     char line_buf[BUFFER_SIZE];
+    char patterns[sizeof(cmd_buffer)];
+    char *token;
     memset(&conf, 0, sizeof(conf));
     conf.config_type = CONF_LOG_GET;
     if (config_log_get(&conf) != 0) {
@@ -468,8 +489,19 @@ int cmd_log() {
     if (fp == NULL) {
         return -1;
     }
+    strncpy(patterns, cmd_buffer, sizeof(patterns));
     while (fgets(line_buf, sizeof(line_buf), fp) != NULL) {
-        printf("%s", line_buf);
+        // 匹配log中的pattern
+        token = strtok(patterns, " ");
+        while (token != NULL) {
+            if (strstr(line_buf, token) == NULL) {
+                break;
+            }
+            token = strtok(NULL, " ");
+        }
+        if (token == NULL) {
+            printf("%s", line_buf);
+        }
     }
     fclose(fp);
     return 0;

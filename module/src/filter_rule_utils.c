@@ -109,13 +109,13 @@ void filter_rule_matched_log(RuleConfig *matched_rule, IpPackInfoV4 *info) {
     }
     switch (info->protocol) {
         case IPPROTO_ICMP:
-            async_log(LOG_INFO, "Rule matched: [%s] [ICMP] [%pI4->%pI4] %s", action, &(info->saddr), &(info->daddr), matched_rule->rule_str);
+            async_log(LOG_INFO, "[FILTER] [%s] [ICMP] [%pI4->%pI4] %s", action, &(info->saddr), &(info->daddr), matched_rule->rule_str);
             break;
         case IPPROTO_TCP:
-            async_log(LOG_INFO, "Rule matched: [%s] [TCP] [%pI4:%hu->%pI4:%hu] %s", action, &(info->saddr), ntohs(info->sport), &(info->daddr), ntohs(info->dport), matched_rule->rule_str);
+            async_log(LOG_INFO, "[FILTER] [%s] [TCP] [%pI4:%hu->%pI4:%hu] %s", action, &(info->saddr), ntohs(info->sport), &(info->daddr), ntohs(info->dport), matched_rule->rule_str);
             break;
         case IPPROTO_UDP:
-            async_log(LOG_INFO, "Rule matched: [%s] [UDP] [%pI4:%hu->%pI4:%hu] %s", action, &(info->saddr), ntohs(info->sport), &(info->daddr), ntohs(info->dport), matched_rule->rule_str);
+            async_log(LOG_INFO, "[FILTER] [%s] [UDP] [%pI4:%hu->%pI4:%hu] %s", action, &(info->saddr), ntohs(info->sport), &(info->daddr), ntohs(info->dport), matched_rule->rule_str);
             break;
     }
 }
@@ -241,22 +241,22 @@ void filter_rule_config(RuleConfig *conf) {
     mutex_lock(chain_mutex);
     switch (conf->config_type) {
         case CONF_RULE_CLEAR:
-            async_log(LOG_WARNING, "Clear rules in %s", chain_name);
+            async_log(LOG_WARNING, "[MANAGE] Clear rules in %s", chain_name);
             filter_rule_clear_v4(rule_link);
             nf_hook_table[conf->hook_chain].rule_link = NULL;
             break;
         case CONF_RULE_INSERT:
-            async_log(LOG_WARNING, "Insert rule to %s idx=%d: %s", chain_name, index, conf->rule_str);
+            async_log(LOG_WARNING, "[MANAGE] Insert rule to %s idx=%d: %s", chain_name, index, conf->rule_str);
             rule_link = filter_rule_insert_v4(rule_link, index, conf);
             nf_hook_table[conf->hook_chain].rule_link = rule_link;
             break;
         case CONF_RULE_REMOVE:
-            async_log(LOG_WARNING, "Remove rule from %s idx=%d: %s", chain_name, index, conf->rule_str);
+            async_log(LOG_WARNING, "[MANAGE] Remove rule from %s idx=%d: %s", chain_name, index, conf->rule_str);
             rule_link = filter_rule_remove_v4(rule_link, index);
             nf_hook_table[conf->hook_chain].rule_link = rule_link;
             break;
         case CONF_RULE_DUMP:
-            async_log(LOG_WARNING, "Dump rules in %s", chain_name);
+            async_log(LOG_WARNING, "[MANAGE] Dump rules in %s", chain_name);
             filter_rule_dump_v4(rule_link, conf->hook_chain, conf->rule_str);
             break;
     }

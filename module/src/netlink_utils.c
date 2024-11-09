@@ -57,13 +57,13 @@ void nl_recv_msg(struct sk_buff *skb) {
 
     // 检查权限，仅允许root用户
     if (uid_eq(__task_cred(current)->euid, GLOBAL_ROOT_UID) == 0) {
-        async_log(LOG_WARNING, "Non-root user, operation not permitte.");
+        async_log(LOG_WARNING, "[MODULE] Non-root user, operation not permitte.");
         return;
     }
 
     // 检查pid是否真实
     if (nlh->nlmsg_pid != task_tgid_vnr(current)) {
-        async_log(LOG_WARNING, "PID error, app pid: %d, msg pid: %d", task_tgid_vnr(current), nlh->nlmsg_pid);
+        async_log(LOG_WARNING, "[MODULE] PID error, app pid: %d, msg pid: %d", task_tgid_vnr(current), nlh->nlmsg_pid);
         return;
     }
     
@@ -101,19 +101,19 @@ int netlink_init(void) {
     };
     nl_sk = netlink_kernel_create(&init_net, NETLINK_USER, &cfg);
     if (nl_sk == NULL) {
-        async_log(LOG_ERROR, "Error creating socket.");
+        async_log(LOG_ERROR, "[MODULE] Error creating socket.");
         return -10;
     }
     for (i = 0; i < MAX_NL_MSG_TYPE; i++) {
         nl_msg_handlers[i] = nl_msg_handler_default;
     }
-    async_log(LOG_WARNING, "Create netlink socket.");
+    async_log(LOG_WARNING, "[MODULE] Create netlink socket.");
     return 0;
 }
 
 void netlink_exit(void) {
     if (nl_sk != NULL) {
         netlink_kernel_release(nl_sk);
-        async_log(LOG_WARNING, "Close, netlink socket.");
+        async_log(LOG_WARNING, "[MODULE] Close, netlink socket.");
     }
 }
