@@ -94,7 +94,30 @@ RuleConfig *filter_rule_match_v4(FilterNodeV4 *rule_link, IpPackInfoV4 *info) {
 }
 
 void filter_rule_matched_log(RuleConfig *matched_rule, IpPackInfoV4 *info) {
-
+    const char *action;
+    if (matched_rule == NULL || info == NULL) {
+        return;
+    }
+    if (matched_rule->rule.rule_type == FILTER_ACCEPT) {
+        action = "ACCEPT";
+    }
+    else if (matched_rule->rule.rule_type == FILTER_DROP) {
+        action = "DROP";
+    }
+    else {
+        return;
+    }
+    switch (info->protocol) {
+        case IPPROTO_ICMP:
+            async_log(LOG_INFO, "Rule matched: [%s] [ICMP] [%pI4->%pI4] %s", action, &(info->saddr), &(info->daddr), matched_rule->rule_str);
+            break;
+        case IPPROTO_TCP:
+            async_log(LOG_INFO, "Rule matched: [%s] [TCP] [%pI4:%hu->%pI4:%hu] %s", action, &(info->saddr), ntohs(info->sport), &(info->daddr), ntohs(info->dport), matched_rule->rule_str);
+            break;
+        case IPPROTO_UDP:
+            async_log(LOG_INFO, "Rule matched: [%s] [UDP] [%pI4:%hu->%pI4:%hu] %s", action, &(info->saddr), ntohs(info->sport), &(info->daddr), ntohs(info->dport), matched_rule->rule_str);
+            break;
+    }
 }
 
 FilterNodeV4 *filter_rule_insert_v4(FilterNodeV4 *rule_link, int index, RuleConfig *conf) {

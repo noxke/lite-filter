@@ -17,6 +17,7 @@ unsigned int hook_prerouting_func(void *priv, struct sk_buff *skb, const struct 
     struct net_device *outdev = state->out;
     IpPackInfoV4 info;
     RuleConfig *matched_rule;
+    int action = NF_ACCEPT;
 
     memset(&info, 0, sizeof(info));
     // 解析ip数据包信息
@@ -38,41 +39,171 @@ unsigned int hook_prerouting_func(void *priv, struct sk_buff *skb, const struct 
     matched_rule = filter_rule_match_v4(nf_hook_table[NF_HOOK_PREROUTING].rule_link, &info);
     if (matched_rule != NULL && matched_rule->rule.match_flags != 0) {
         filter_rule_matched_log(matched_rule, &info);
+        if (matched_rule->rule.rule_type == FILTER_ACCEPT) {
+            action = NF_ACCEPT;
+        }
+        else if (matched_rule->rule.rule_type == FILTER_DROP) {
+            action = NF_DROP;
+        }
     }
 
-    return NF_ACCEPT;
+    return action;
 }
 
 // Hook function for INPUT chain
 unsigned int hook_input_func(void *priv, struct sk_buff *skb, const struct nf_hook_state *state) {
     struct net_device *indev = state->in;
     struct net_device *outdev = state->out;
+    IpPackInfoV4 info;
+    RuleConfig *matched_rule;
+    int action = NF_ACCEPT;
 
-    return NF_ACCEPT;
+    memset(&info, 0, sizeof(info));
+    // 解析ip数据包信息
+    get_ip_pack_info_v4(skb, &info);
+    if (indev != 0) {
+        info.indev = indev->ifindex;
+    }
+    else {
+        info.indev = -1;
+    }
+    if (outdev != 0) {
+        info.outdev = outdev->ifindex;
+    }
+    else {
+        info.outdev = -1;
+    }
+    
+    // 匹配LOCALIN链表
+    matched_rule = filter_rule_match_v4(nf_hook_table[NF_HOOK_LOCALIN].rule_link, &info);
+    if (matched_rule != NULL && matched_rule->rule.match_flags != 0) {
+        filter_rule_matched_log(matched_rule, &info);
+        if (matched_rule->rule.rule_type == FILTER_ACCEPT) {
+            action = NF_ACCEPT;
+        }
+        else if (matched_rule->rule.rule_type == FILTER_DROP) {
+            action = NF_DROP;
+        }
+    }
+
+    return action;
 }
 
 // Hook function for FORWARD chain
 unsigned int hook_forward_func(void *priv, struct sk_buff *skb, const struct nf_hook_state *state) {
     struct net_device *indev = state->in;
     struct net_device *outdev = state->out;
+    IpPackInfoV4 info;
+    RuleConfig *matched_rule;
+    int action = NF_ACCEPT;
 
-    return NF_ACCEPT;
+    memset(&info, 0, sizeof(info));
+    // 解析ip数据包信息
+    get_ip_pack_info_v4(skb, &info);
+    if (indev != 0) {
+        info.indev = indev->ifindex;
+    }
+    else {
+        info.indev = -1;
+    }
+    if (outdev != 0) {
+        info.outdev = outdev->ifindex;
+    }
+    else {
+        info.outdev = -1;
+    }
+    
+    // 匹配FORWARD链表
+    matched_rule = filter_rule_match_v4(nf_hook_table[NF_HOOK_FORWARD].rule_link, &info);
+    if (matched_rule != NULL && matched_rule->rule.match_flags != 0) {
+        filter_rule_matched_log(matched_rule, &info);
+        if (matched_rule->rule.rule_type == FILTER_ACCEPT) {
+            action = NF_ACCEPT;
+        }
+        else if (matched_rule->rule.rule_type == FILTER_DROP) {
+            action = NF_DROP;
+        }
+    }
+
+    return action;
 }
 
 // Hook function for OUTPUT chain
 unsigned int hook_output_func(void *priv, struct sk_buff *skb, const struct nf_hook_state *state) {
     struct net_device *indev = state->in;
     struct net_device *outdev = state->out;
+    IpPackInfoV4 info;
+    RuleConfig *matched_rule;
+    int action = NF_ACCEPT;
 
-    return NF_ACCEPT;
+    memset(&info, 0, sizeof(info));
+    // 解析ip数据包信息
+    get_ip_pack_info_v4(skb, &info);
+    if (indev != 0) {
+        info.indev = indev->ifindex;
+    }
+    else {
+        info.indev = -1;
+    }
+    if (outdev != 0) {
+        info.outdev = outdev->ifindex;
+    }
+    else {
+        info.outdev = -1;
+    }
+    
+    // 匹配LOCALOUT链表
+    matched_rule = filter_rule_match_v4(nf_hook_table[NF_HOOK_LOCALOUT].rule_link, &info);
+    if (matched_rule != NULL && matched_rule->rule.match_flags != 0) {
+        filter_rule_matched_log(matched_rule, &info);
+        if (matched_rule->rule.rule_type == FILTER_ACCEPT) {
+            action = NF_ACCEPT;
+        }
+        else if (matched_rule->rule.rule_type == FILTER_DROP) {
+            action = NF_DROP;
+        }
+    }
+
+    return action;
 }
 
 // Hook function for POSTROUTING chain
 unsigned int hook_postrouting_func(void *priv, struct sk_buff *skb, const struct nf_hook_state *state) {
     struct net_device *indev = state->in;
     struct net_device *outdev = state->out;
+    IpPackInfoV4 info;
+    RuleConfig *matched_rule;
+    int action = NF_ACCEPT;
 
-    return NF_ACCEPT;
+    memset(&info, 0, sizeof(info));
+    // 解析ip数据包信息
+    get_ip_pack_info_v4(skb, &info);
+    if (indev != 0) {
+        info.indev = indev->ifindex;
+    }
+    else {
+        info.indev = -1;
+    }
+    if (outdev != 0) {
+        info.outdev = outdev->ifindex;
+    }
+    else {
+        info.outdev = -1;
+    }
+    
+    // 匹配POSTROUTING链表
+    matched_rule = filter_rule_match_v4(nf_hook_table[NF_HOOK_POSTROUTING].rule_link, &info);
+    if (matched_rule != NULL && matched_rule->rule.match_flags != 0) {
+        filter_rule_matched_log(matched_rule, &info);
+        if (matched_rule->rule.rule_type == FILTER_ACCEPT) {
+            action = NF_ACCEPT;
+        }
+        else if (matched_rule->rule.rule_type == FILTER_DROP) {
+            action = NF_DROP;
+        }
+    }
+
+    return action;
 }
 
 struct nf_hook_table_struct nf_hook_table[NF_HOOK_MAX] = {
