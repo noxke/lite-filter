@@ -481,7 +481,7 @@ int cmd_ls() {
 
 int cmd_add() {
     RuleConfig conf;
-    if (rule_parser(cmd_buffer, &conf) != 0) {
+    if (rule_parser(cmd_buffer, &conf) != 0 || rule_format(&conf, conf.rule_str, sizeof(conf.rule_str)) != 0) {
         return -1;
     }
     return config_rule_insert(&conf, rule_idx);
