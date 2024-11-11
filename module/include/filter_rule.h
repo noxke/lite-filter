@@ -3,6 +3,8 @@
 // 过滤器规则接口
 
 #define MAX_RULE_STR_SIZE 256
+// 默认过期时间300s
+#define DEFAULT_EXPIRE 300
 
 typedef unsigned char u8;
 
@@ -68,11 +70,27 @@ typedef struct {
     int index;
     FilterRuleV4 rule;
     char rule_str[MAX_RULE_STR_SIZE];
-}RuleConfig;
+} RuleConfig;
 
 typedef struct _FilterNodeV4 {
     RuleConfig rule_conf;
     struct _FilterNodeV4 *next;
 } FilterNodeV4;
+
+typedef struct _FilterStatusNodeV4 {
+    IpPackInfoV4 ip_info;
+    unsigned char protocol;
+    unsigned char status;
+    int expire;
+    struct _FilterStatusNodeV4 *next;
+} FilterStatusNodeV4;
+
+typedef struct _FilterNatNodeV4 {
+    IpPackInfoV4 ip_info;
+    __be32 nataddr;
+    __be16 natport;
+    int expire;
+    struct _FilterNatNodeV4 *next;
+} FilterNatNodeV4;
 
 #endif // __FILTER_RULE_H__

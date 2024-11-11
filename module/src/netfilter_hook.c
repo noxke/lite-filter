@@ -5,7 +5,7 @@
 #include <linux/if_ether.h>
 #include <linux/in.h>
 #include <linux/netdevice.h>
-#include <linux/mutex.h>
+#include <linux/semaphore.h>
 
 #include "log_utils.h"
 #include "netfilter_hook.h"
@@ -34,6 +34,9 @@ unsigned int hook_prerouting_func(void *priv, struct sk_buff *skb, const struct 
     else {
         info.outdev = -1;
     }
+
+    // 获取读sem
+    up_read(&(nf_hook_table[NF_HOOK_PREROUTING].rw_sem));
     
     // 匹配PREROUTING链表
     matched_rule = filter_rule_match_v4(nf_hook_table[NF_HOOK_PREROUTING].rule_link, &info);
@@ -46,6 +49,9 @@ unsigned int hook_prerouting_func(void *priv, struct sk_buff *skb, const struct 
             action = NF_DROP;
         }
     }
+
+    // 释放读sem
+    down_read(&(nf_hook_table[NF_HOOK_PREROUTING].rw_sem));
 
     return action;
 }
@@ -73,6 +79,9 @@ unsigned int hook_input_func(void *priv, struct sk_buff *skb, const struct nf_ho
     else {
         info.outdev = -1;
     }
+
+    // 获取读sem
+    up_read(&(nf_hook_table[NF_HOOK_LOCALIN].rw_sem));
     
     // 匹配LOCALIN链表
     matched_rule = filter_rule_match_v4(nf_hook_table[NF_HOOK_LOCALIN].rule_link, &info);
@@ -85,6 +94,9 @@ unsigned int hook_input_func(void *priv, struct sk_buff *skb, const struct nf_ho
             action = NF_DROP;
         }
     }
+
+    // 释放读sem
+    down_read(&(nf_hook_table[NF_HOOK_LOCALIN].rw_sem));
 
     return action;
 }
@@ -113,6 +125,9 @@ unsigned int hook_forward_func(void *priv, struct sk_buff *skb, const struct nf_
         info.outdev = -1;
     }
     
+    // 获取读sem
+    up_read(&(nf_hook_table[NF_HOOK_FORWARD].rw_sem));
+
     // 匹配FORWARD链表
     matched_rule = filter_rule_match_v4(nf_hook_table[NF_HOOK_FORWARD].rule_link, &info);
     if (matched_rule != NULL && matched_rule->rule.match_flags != 0) {
@@ -124,6 +139,9 @@ unsigned int hook_forward_func(void *priv, struct sk_buff *skb, const struct nf_
             action = NF_DROP;
         }
     }
+
+    // 释放读sem
+    down_read(&(nf_hook_table[NF_HOOK_FORWARD].rw_sem));
 
     return action;
 }
@@ -152,6 +170,9 @@ unsigned int hook_output_func(void *priv, struct sk_buff *skb, const struct nf_h
         info.outdev = -1;
     }
     
+    // 获取读sem
+    up_read(&(nf_hook_table[NF_HOOK_LOCALOUT].rw_sem));
+
     // 匹配LOCALOUT链表
     matched_rule = filter_rule_match_v4(nf_hook_table[NF_HOOK_LOCALOUT].rule_link, &info);
     if (matched_rule != NULL && matched_rule->rule.match_flags != 0) {
@@ -163,6 +184,9 @@ unsigned int hook_output_func(void *priv, struct sk_buff *skb, const struct nf_h
             action = NF_DROP;
         }
     }
+
+    // 释放读sem
+    down_read(&(nf_hook_table[NF_HOOK_LOCALOUT].rw_sem));
 
     return action;
 }
@@ -190,6 +214,9 @@ unsigned int hook_postrouting_func(void *priv, struct sk_buff *skb, const struct
     else {
         info.outdev = -1;
     }
+
+    // 获取读sem
+    up_read(&(nf_hook_table[NF_HOOK_POSTROUTING].rw_sem));
     
     // 匹配POSTROUTING链表
     matched_rule = filter_rule_match_v4(nf_hook_table[NF_HOOK_POSTROUTING].rule_link, &info);
@@ -203,16 +230,17 @@ unsigned int hook_postrouting_func(void *priv, struct sk_buff *skb, const struct
         }
     }
 
+    // 释放读sem
+    down_read(&(nf_hook_table[NF_HOOK_POSTROUTING].rw_sem));
+
     return action;
 }
 
 struct nf_hook_table_struct nf_hook_table[NF_HOOK_MAX] = {
     {
-        .rule_link = NULL,
         .chain_name = "NONE",
     },
     {
-        .rule_link = NULL,
         .chain_name = "PREROUTING",
         .ops = {
             .hook = hook_prerouting_func,
@@ -222,7 +250,6 @@ struct nf_hook_table_struct nf_hook_table[NF_HOOK_MAX] = {
         },
     },
     {
-        .rule_link = NULL,
         .chain_name = "LOCALIN",
         .ops = {
             .hook = hook_input_func,
@@ -232,7 +259,6 @@ struct nf_hook_table_struct nf_hook_table[NF_HOOK_MAX] = {
         },
     },
     {
-        .rule_link = NULL,
         .chain_name = "FORWARD",
         .ops = {
             .hook = hook_forward_func,
@@ -242,7 +268,6 @@ struct nf_hook_table_struct nf_hook_table[NF_HOOK_MAX] = {
         },
     },
     {
-        .rule_link = NULL,
         .chain_name = "LOCALOUT",
         .ops = {
             .hook = hook_output_func,
@@ -252,7 +277,6 @@ struct nf_hook_table_struct nf_hook_table[NF_HOOK_MAX] = {
         },
     },
     {
-        .rule_link = NULL,
         .chain_name = "POSTROUTING",
         .ops = {
             .hook = hook_postrouting_func,
@@ -262,7 +286,6 @@ struct nf_hook_table_struct nf_hook_table[NF_HOOK_MAX] = {
         },
     },
     {
-        .rule_link = NULL,
         .chain_name = "NAT",
     },
 };
@@ -270,9 +293,13 @@ struct nf_hook_table_struct nf_hook_table[NF_HOOK_MAX] = {
 
 int nf_hook_init() {
     int i;
-    // 初始化锁
+    // 初始化nf_hook_table
     for (i = NF_HOOK_NONE+1; i < NF_HOOK_MAX; i++) {
-        mutex_init(&(nf_hook_table[i].chain_mutex));
+        nf_hook_table[i].rule_link = NULL;
+        nf_hook_table[i].status_link = NULL;
+        nf_hook_table[i].nat_link = NULL;
+        // 初始化信号量
+        init_rwsem(&(nf_hook_table[i].rw_sem));
     }
     // 注册钩子
     for (i = NF_HOOK_NONE+1; i < NF_HOOK_NAT; i++) {
@@ -287,8 +314,11 @@ void nf_hook_exit() {
     for (i = NF_HOOK_NONE+1; i < NF_HOOK_NAT; i++) {
         nf_unregister_net_hook(&init_net, &(nf_hook_table[i].ops));
     }
-    // 销毁锁
+    // 清除所有的规则链
     for (i = NF_HOOK_NONE+1; i < NF_HOOK_MAX; i++) {
-        mutex_destroy(&(nf_hook_table[i].chain_mutex));
+        filter_rule_clear_v4(nf_hook_table[i].rule_link);
+        nf_hook_table[i].rule_link = NULL;
+        nf_hook_table[i].status_link = NULL;
+        nf_hook_table[i].nat_link = NULL;
     }
 }

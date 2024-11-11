@@ -17,6 +17,8 @@ void filter_rule_matched_log(RuleConfig *matched_rule, IpPackInfoV4 *info);
 FilterNodeV4 *filter_rule_insert_v4(FilterNodeV4 *rule_link, int index, RuleConfig *conf);
 FilterNodeV4 *filter_rule_remove_v4(FilterNodeV4 *rule_link, int index);
 
+void filter_rule_clear_v4(FilterNodeV4 *rule_link);
+
 extern void filter_rule_config(RuleConfig *conf);
 
 #endif // __FILTER_RULE_UTILS_H__

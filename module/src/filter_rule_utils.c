@@ -7,7 +7,7 @@
 #include <linux/tcp.h>
 #include <linux/icmp.h>
 #include <linux/icmpv6.h>
-#include <linux/mutex.h>
+#include <linux/semaphore.h>
 
 #include "log_utils.h"
 #include "netlink_msg.h"
@@ -230,15 +230,16 @@ void filter_rule_config(RuleConfig *conf) {
     int index;
     FilterNodeV4 *rule_link;
     const char *chain_name;
-    struct mutex *chain_mutex;
+    struct rw_semaphore *rw_sem;
     if (conf->hook_chain <= NF_HOOK_NONE || conf->hook_chain >= NF_HOOK_MAX) {
         return;
     }
     index = conf->index;
     rule_link = nf_hook_table[conf->hook_chain].rule_link;
     chain_name = nf_hook_table[conf->hook_chain].chain_name;
-    chain_mutex = &(nf_hook_table[conf->hook_chain].chain_mutex);
-    mutex_lock(chain_mutex);
+    rw_sem = &(nf_hook_table[conf->hook_chain].rw_sem);
+    // 获取写sem
+    down_write(rw_sem);
     switch (conf->config_type) {
         case CONF_RULE_CLEAR:
             async_log(LOG_WARNING, "[MANAGE] Clear rules in %s", chain_name);
@@ -260,5 +261,6 @@ void filter_rule_config(RuleConfig *conf) {
             filter_rule_dump_v4(rule_link, conf->hook_chain, conf->rule_str);
             break;
     }
-    mutex_unlock(chain_mutex);
+    // 释放写sem
+    up_write(rw_sem);
 }

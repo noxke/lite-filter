@@ -4,12 +4,14 @@
 
 #include <linux/netfilter.h>
 #include <linux/netfilter_ipv4.h>
-#include "linux/mutex.h"
+#include <linux/semaphore.h>
 #include "filter_rule_utils.h"
 
 struct nf_hook_table_struct {
     FilterNodeV4 *rule_link;
-    struct mutex chain_mutex;
+    FilterStatusNodeV4 *status_link;
+    FilterNatNodeV4 *nat_link;
+    struct rw_semaphore rw_sem;      // 信号量，用于避免读时写
     const char *chain_name;
     struct nf_hook_ops ops;
 };
