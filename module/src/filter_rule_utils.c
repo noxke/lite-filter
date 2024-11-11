@@ -16,6 +16,9 @@
 #include "netfilter_hook.h"
 #include "filter_rule_utils.h"
 
+#define addr4_match(a1, a2, prefixlen) \
+    (((prefixlen) == 0 || ((((a1) ^ (a2)) & htonl(~0UL << (32 - (prefixlen)))) == 0)) ? 0 : -1)
+
 void get_ip_pack_info_v4(struct sk_buff *skb, IpPackInfoV4 *info) {
     struct iphdr *ip_header;
     struct tcphdr *tcp_header;
@@ -45,16 +48,6 @@ void get_ip_pack_info_v4(struct sk_buff *skb, IpPackInfoV4 *info) {
     }
 }
 
-int addr4_amtch(__be32 a1, __be32 a2, u8 prefixlen) {
-    if (prefixlen == 0) {
-        return 0;
-    }
-    if (((a1 ^ a2) & htonl(~0UL << (32 - prefixlen))) == 0) {
-        return 0;
-    }
-    return -1;
-}
-
 RuleConfig *filter_rule_match_v4(FilterNodeV4 *rule_link, IpPackInfoV4 *info) {
     FilterNodeV4 *rule_next;
     RuleConfig *rule_conf;
@@ -76,10 +69,10 @@ RuleConfig *filter_rule_match_v4(FilterNodeV4 *rule_link, IpPackInfoV4 *info) {
         if (((rule->match_flags & FILTER_MATCH_PROTO) != 0) && (rule->protocol != info->protocol)) {
             continue;
         }
-        if (((rule->match_flags & FILTER_MATCH_SADDR) != 0) && addr4_amtch(rule->saddr, info->saddr, rule->sprefixlen) != 0) {
+        if (((rule->match_flags & FILTER_MATCH_SADDR) != 0) && addr4_match(rule->saddr, info->saddr, rule->sprefixlen) != 0) {
             continue;
         }
-        if (((rule->match_flags & FILTER_MATCH_DADDR) != 0) && addr4_amtch(rule->daddr, info->daddr, rule->dprefixlen) != 0) {
+        if (((rule->match_flags & FILTER_MATCH_DADDR) != 0) && addr4_match(rule->daddr, info->daddr, rule->dprefixlen) != 0) {
             continue;
         }
         if (((rule->match_flags & FILTER_MATCH_SPORT) != 0) && (rule->sport != info->sport)) {
