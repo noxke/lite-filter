@@ -198,6 +198,7 @@ void filter_rule_dump_v4(FilterNodeV4 *rule_link, int hook_chain, const char *tm
     next = rule_link;
     msg = (struct nl_msg_struct *)kmalloc(NL_MSG_SIZE(sizeof(RuleConfig)), GFP_KERNEL);
     if (msg == NULL) {
+        filp_close(fp, NULL);
         return;
     }
     msg->msg_type = NL_MSG_CONF;
