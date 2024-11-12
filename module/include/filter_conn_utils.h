@@ -10,6 +10,8 @@
 
 #include "filter_rule.h"
 
+#define CONN_DROP ((FilterConnNodeV4 *)-1)
+
 FilterConnNodeV4 *filter_conn_match_v4(IpPackInfoV4 *info, struct sk_buff *skb);
 
 int filter_conn_insert_v4(IpPackInfoV4 *info, struct sk_buff *skb);

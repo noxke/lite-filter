@@ -41,15 +41,18 @@ int get_tcp_status_v4(FilterConnNodeV4 *conn, IpPackInfoV4 *info, struct sk_buff
     }
     else {
         // 匹配错误，不可能出现的情况
-        return FILTER_STATUS_TCP_CLOSED;
+        return FILTER_STATUS_NONE;
     }
-    new_status = conn->status;
+    // async_log(LOG_INFO, "### %pI4->%pI4 syn=%d ack=%d fin=%d ###", &(info->saddr), &(info->daddr), tcp_header->syn, tcp_header->ack, tcp_header->fin);
+    new_status = FILTER_STATUS_NONE;
     switch (conn->status) {
         case FILTER_STATUS_NONE:
         case FILTER_STATUS_TCP_CLOSED:
             if (tcp_header->syn == 1) {
-                // 接收到ack=1，客户端、服务器身份发生改变，ack=1由客户端发往服务器
-                memcpy(&(conn->ip_info), info, sizeof(conn->ip_info));
+                if (is_tcp_c2s == 0) {
+                    // 接收到syn=1，客户端、服务器身份发生改变，syn=1由客户端发往服务器
+                    memcpy(&(conn->ip_info), info, sizeof(conn->ip_info));
+                }
                 new_status = FILTER_STATUS_TCP_SYN_SENT;
             }
             break;
@@ -58,6 +61,9 @@ int get_tcp_status_v4(FilterConnNodeV4 *conn, IpPackInfoV4 *info, struct sk_buff
                 if (is_tcp_c2s == 0) {
                     new_status = FILTER_STATUS_TCP_ESTABLISHED;
                 }
+            }
+            else {
+                new_status = FILTER_STATUS_TCP_SYN_SENT;
             }
             break;
         case FILTER_STATUS_TCP_SYN_RECEIVED:
@@ -68,15 +74,26 @@ int get_tcp_status_v4(FilterConnNodeV4 *conn, IpPackInfoV4 *info, struct sk_buff
             }
             break;
         case FILTER_STATUS_TCP_ESTABLISHED:
-            if (tcp_header->fin == 1) {
+            if (tcp_header->fin == 1 && tcp_header->ack == 0) {
                 // 接收到fin=1，客户端、服务器身份发生改变，fin=1由客户端发往服务器
                 memcpy(&(conn->ip_info), info, sizeof(conn->ip_info));
                 new_status = FILTER_STATUS_TCP_LAST_ACK;
             }
+            else if (tcp_header->fin == 1 && tcp_header->ack == 1) {
+                // 接收到fin=1，客户端、服务器身份发生改变，fin=1由客户端发往服务器
+                memcpy(&(conn->ip_info), info, sizeof(conn->ip_info));
+                new_status = FILTER_STATUS_TCP_FIN_WAIT;
+            }
+            else {
+                new_status =FILTER_STATUS_TCP_ESTABLISHED;
+            }
             break;
         case FILTER_STATUS_TCP_FIN_WAIT:
-            if (tcp_header->fin == 1 && tcp_header->ack == 1) {
-                new_status = FILTER_STATUS_TCP_CLOSED;
+            if (is_tcp_c2s == 0 && tcp_header->fin == 1) {
+                new_status = FILTER_STATUS_TCP_TIME_WAIT;
+            }
+            else {
+                new_status = FILTER_STATUS_TCP_FIN_WAIT;
             }
             break;
         case FILTER_STATUS_TCP_CLOSE_WAIT:
@@ -84,7 +101,7 @@ int get_tcp_status_v4(FilterConnNodeV4 *conn, IpPackInfoV4 *info, struct sk_buff
                 new_status = FILTER_STATUS_TCP_LAST_ACK;
             }
             break;
-        case FILTER_STATUS_TCP_LAST_ACK:
+        case FILTER_STATUS_TCP_LAST_ACK:// async_log(LOG_INFO, "### %pI4->%pI4 syn=%d ack=%d fin=%d ###", &(info->saddr), &(info->daddr), tcp_header->syn, tcp_header->ack, tcp_header->fin);
             if (tcp_header->ack == 1) {
                 new_status = FILTER_STATUS_TCP_CLOSED;
             }
@@ -192,6 +209,7 @@ void status_format(FilterConnNodeV4 *conn, char *buf, int size) {
 FilterConnNodeV4 *filter_conn_match_v4(IpPackInfoV4 *info, struct sk_buff *skb) {
     char status_str[DEFAULT_STR_SIZE];
     FilterConnNodeV4 *next;
+    int next_status;
     struct timespec64 current_time;
     u64 current_sec;
     if (info == NULL || skb == NULL) {
@@ -235,11 +253,21 @@ FilterConnNodeV4 *filter_conn_match_v4(IpPackInfoV4 *info, struct sk_buff *skb) 
         next = next->next;
     }
     if (next != NULL) {
-        // 匹配成功，更新状态和过期时间
-        next->expire_time = current_sec + EXPIRE_TIME;
-        next->status = get_ip_pack_status_v4(next, info, skb);
-        status_format(next, status_str, sizeof(status_str));
-        async_log(LOG_INFO, "[FILTER] [CONN_MATCH] %s", status_str);
+        // 检查状态是否异常
+        next_status = get_ip_pack_status_v4(next, info, skb);
+        if (next_status == FILTER_STATUS_NONE) {
+            // 异常状态丢弃
+            status_format(next, status_str, sizeof(status_str));
+            async_log(LOG_INFO, "[FILTER] [CONN_DROP] %s", status_str);
+            next = CONN_DROP;
+        }
+        else {
+            // 匹配成功，更新状态和过期时间
+            next->expire_time = current_sec + EXPIRE_TIME;
+            next->status = next_status;
+            status_format(next, status_str, sizeof(status_str));
+            async_log(LOG_INFO, "[FILTER] [CONN_MATCH] %s", status_str);
+        }
     }
 
     return next;
