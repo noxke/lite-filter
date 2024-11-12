@@ -74,9 +74,14 @@ int get_ip_pack_conn_v4(FilterConnNodeV4 *conn, IpPackInfoV4 *info, struct sk_bu
 void status_format(FilterConnNodeV4 *conn, char *buf, int size) {
     char *status_str;
     IpPackInfoV4 *info;
+    struct timespec64 current_time;
+    long long int expired_sec;
     if (conn == NULL || buf == NULL) {
         return;
     }
+    // 获取当前时间
+    ktime_get_real_ts64(&current_time);
+    expired_sec = conn->expire_time - current_time.tv_sec;
     info = &(conn->ip_info);
     memset(buf, 0, size);
     switch (conn->status) {
@@ -119,13 +124,13 @@ void status_format(FilterConnNodeV4 *conn, char *buf, int size) {
     }
     switch (conn->protocol) {
         case IPPROTO_ICMP:
-            snprintf(buf, size, "%pI4->%pI4 %s",  &(info->saddr), &(info->daddr), status_str);
+            snprintf(buf, size, "%pI4->%pI4 %s expired: %llds",  &(info->saddr), &(info->daddr), status_str, expired_sec);
             break;
         case IPPROTO_TCP:
-            snprintf(buf, size, "%pI4:%hu->%pI4:%hu %s", &(info->saddr), ntohs(info->sport), &(info->daddr), ntohs(info->dport), status_str);
+            snprintf(buf, size, "%pI4:%hu->%pI4:%hu %s expired: %llds", &(info->saddr), ntohs(info->sport), &(info->daddr), ntohs(info->dport), status_str, expired_sec);
             break;
         case IPPROTO_UDP:
-            snprintf(buf, size, "%pI4:%hu->%pI4:%hu %s", &(info->saddr), ntohs(info->sport), &(info->daddr), ntohs(info->dport), status_str);
+            snprintf(buf, size, "%pI4:%hu->%pI4:%hu %s expired: %llds", &(info->saddr), ntohs(info->sport), &(info->daddr), ntohs(info->dport), status_str, expired_sec);
             break;
         default:
             break;
