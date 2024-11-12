@@ -18,8 +18,6 @@
 #include "netfilter_hook.h"
 #include "filter_conn_utils.h"
 
-#define STATUS_STR_SIZE 256
-
 #define addr4_match(a1, a2, prefixlen) \
     (((prefixlen) == 0 || ((((a1) ^ (a2)) & htonl(~0UL << (32 - (prefixlen)))) == 0)) ? 0 : -1)
 
@@ -135,7 +133,7 @@ void status_format(FilterConnNodeV4 *conn, char *buf, int size) {
 }
 
 FilterConnNodeV4 *filter_conn_match_v4(IpPackInfoV4 *info, struct sk_buff *skb) {
-    char status_str[STATUS_STR_SIZE];
+    char status_str[DEFAULT_STR_SIZE];
     FilterConnNodeV4 *next;
     struct timespec64 current_time;
     u64 current_sec;
@@ -191,7 +189,7 @@ FilterConnNodeV4 *filter_conn_match_v4(IpPackInfoV4 *info, struct sk_buff *skb) 
 }
 
 int filter_conn_insert_v4(IpPackInfoV4 *info, struct sk_buff *skb) {
-    char status_str[STATUS_STR_SIZE];
+    char status_str[DEFAULT_STR_SIZE];
     FilterConnNodeV4 *next;
     FilterConnNodeV4 *new_node;
     struct timespec64 current_time;
@@ -236,8 +234,7 @@ void filter_conn_clear_v4(FilterConnNodeV4 *conn_link) {
     if (conn_link == NULL) {
         return;
     }
-    // 获取写sem
-    down_write(&nf_hook_conn_rwsem);
+
     next = conn_link;
     while (next != NULL) {
         rm_node = next;
@@ -247,7 +244,7 @@ void filter_conn_clear_v4(FilterConnNodeV4 *conn_link) {
 }
 
 void filter_conn_dump_v4(FilterConnNodeV4 *conn_link, const char *tmpfile) {
-    char status_str[STATUS_STR_SIZE];
+    char status_str[DEFAULT_STR_SIZE];
     FilterConnNodeV4 *next;
     struct nl_msg_struct *msg;
     ConnConfig *msg_conf;
@@ -305,7 +302,7 @@ void filter_conn_updater(struct timer_list *t) {
     u64 current_sec;
     FilterConnNodeV4 *next;
     FilterConnNodeV4 *prev;
-    char status_str[STATUS_STR_SIZE];
+    char status_str[DEFAULT_STR_SIZE];
 
     // 获取写sem
     down_write(&nf_hook_conn_rwsem);
