@@ -217,6 +217,7 @@ unsigned int hook_postrouting_func(void *priv, struct sk_buff *skb, const struct
     struct net_device *outdev = state->out;
     IpPackInfoV4 info;
     RuleConfig *matched_rule;
+    FilterConnNodeV4 *matched_conn;
     int action = NF_ACCEPT;
 
     memset(&info, 0, sizeof(info));
@@ -235,6 +236,17 @@ unsigned int hook_postrouting_func(void *priv, struct sk_buff *skb, const struct
         info.outdev = -1;
     }
 
+    // 先在状态表内进行匹配
+    // 获取读sem
+    down_read(&nf_hook_conn_rwsem);
+    matched_conn = filter_conn_match_v4(&info, skb);
+    // // 释放读sem
+    up_read(&nf_hook_conn_rwsem);
+    // 匹配成功则直接放行报文
+    if (matched_conn != NULL) {
+        return NF_ACCEPT;
+    }
+
     // 获取读sem
     down_read(&(nf_hook_table[NF_HOOK_POSTROUTING].rw_sem));
     
@@ -244,6 +256,12 @@ unsigned int hook_postrouting_func(void *priv, struct sk_buff *skb, const struct
         filter_rule_matched_log(matched_rule, &info);
         if (matched_rule->rule.rule_type == FILTER_ACCEPT) {
             action = NF_ACCEPT;
+            // 如果规则链中匹配成功，则添加新连接
+            // 获取写sem
+            down_write(&nf_hook_conn_rwsem);
+            filter_conn_insert_v4(&info, skb);
+            // 释放写sem
+            up_write(&nf_hook_conn_rwsem);
         }
         else if (matched_rule->rule.rule_type == FILTER_DROP) {
             action = NF_DROP;

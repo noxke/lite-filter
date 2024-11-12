@@ -21,9 +21,10 @@
 #define addr4_match(a1, a2, prefixlen) \
     (((prefixlen) == 0 || ((((a1) ^ (a2)) & htonl(~0UL << (32 - (prefixlen)))) == 0)) ? 0 : -1)
 
-int get_tcp_conn_v4(FilterConnNodeV4 *conn, IpPackInfoV4 *info, struct sk_buff *skb) {
+int get_tcp_status_v4(FilterConnNodeV4 *conn, IpPackInfoV4 *info, struct sk_buff *skb) {
     struct tcphdr *tcp_header;
     int is_tcp_c2s;
+    int new_status;
     if (conn == NULL || info == NULL || skb == NULL) {
         return -1;
     }
@@ -42,11 +43,62 @@ int get_tcp_conn_v4(FilterConnNodeV4 *conn, IpPackInfoV4 *info, struct sk_buff *
         // 匹配错误，不可能出现的情况
         return FILTER_STATUS_TCP_CLOSED;
     }
+    new_status = conn->status;
+    switch (conn->status) {
+        case FILTER_STATUS_NONE:
+        case FILTER_STATUS_TCP_CLOSED:
+            if (tcp_header->syn == 1) {
+                // 接收到ack=1，客户端、服务器身份发生改变，ack=1由客户端发往服务器
+                memcpy(&(conn->ip_info), info, sizeof(conn->ip_info));
+                new_status = FILTER_STATUS_TCP_SYN_SENT;
+            }
+            break;
+        case FILTER_STATUS_TCP_SYN_SENT:
+            if (tcp_header->syn == 1 && tcp_header->ack == 1) {
+                if (is_tcp_c2s == 0) {
+                    new_status = FILTER_STATUS_TCP_ESTABLISHED;
+                }
+            }
+            break;
+        case FILTER_STATUS_TCP_SYN_RECEIVED:
+            if (tcp_header->ack == 1) {
+                if (is_tcp_c2s == 1) {
+                    new_status = FILTER_STATUS_TCP_ESTABLISHED;
+                }
+            }
+            break;
+        case FILTER_STATUS_TCP_ESTABLISHED:
+            if (tcp_header->fin == 1) {
+                // 接收到fin=1，客户端、服务器身份发生改变，fin=1由客户端发往服务器
+                memcpy(&(conn->ip_info), info, sizeof(conn->ip_info));
+                new_status = FILTER_STATUS_TCP_LAST_ACK;
+            }
+            break;
+        case FILTER_STATUS_TCP_FIN_WAIT:
+            if (tcp_header->fin == 1 && tcp_header->ack == 1) {
+                new_status = FILTER_STATUS_TCP_CLOSED;
+            }
+            break;
+        case FILTER_STATUS_TCP_CLOSE_WAIT:
+            if (tcp_header->fin == 1 && tcp_header->ack == 1) {
+                new_status = FILTER_STATUS_TCP_LAST_ACK;
+            }
+            break;
+        case FILTER_STATUS_TCP_LAST_ACK:
+            if (tcp_header->ack == 1) {
+                new_status = FILTER_STATUS_TCP_CLOSED;
+            }
+            break;
+        case FILTER_STATUS_TCP_TIME_WAIT:
+            new_status = FILTER_STATUS_TCP_CLOSED;
+            break;
+    }
+
     // 状态机
-    return FILTER_STATUS_TCP_CLOSED;
+    return new_status;
 }
 
-int get_ip_pack_conn_v4(FilterConnNodeV4 *conn, IpPackInfoV4 *info, struct sk_buff *skb) {
+int get_ip_pack_status_v4(FilterConnNodeV4 *conn, IpPackInfoV4 *info, struct sk_buff *skb) {
     struct iphdr *ip_header;
     if (conn == NULL || info == NULL || skb == NULL) {
         return -1;
@@ -59,7 +111,7 @@ int get_ip_pack_conn_v4(FilterConnNodeV4 *conn, IpPackInfoV4 *info, struct sk_bu
             break;
         case IPPROTO_TCP:
             // TCP状态机
-            return get_tcp_conn_v4(conn, info, skb);
+            return get_tcp_status_v4(conn, info, skb);
             break;
         case IPPROTO_UDP:
             // UDP无状态机
@@ -185,7 +237,7 @@ FilterConnNodeV4 *filter_conn_match_v4(IpPackInfoV4 *info, struct sk_buff *skb) 
     if (next != NULL) {
         // 匹配成功，更新状态和过期时间
         next->expire_time = current_sec + EXPIRE_TIME;
-        next->status = get_ip_pack_conn_v4(next, info, skb);
+        next->status = get_ip_pack_status_v4(next, info, skb);
         status_format(next, status_str, sizeof(status_str));
         async_log(LOG_INFO, "[FILTER] [CONN_MATCH] %s", status_str);
     }
@@ -215,7 +267,7 @@ int filter_conn_insert_v4(IpPackInfoV4 *info, struct sk_buff *skb) {
     // 设置过期时间
     new_node->expire_time = current_sec + EXPIRE_TIME;
     new_node->status = FILTER_STATUS_NONE;
-    new_node->status = get_ip_pack_conn_v4(new_node, info, skb);
+    new_node->status = get_ip_pack_status_v4(new_node, info, skb);
     // 插入到链表末尾
     if (nf_hook_conn_link == NULL) {
         nf_hook_conn_link = new_node;
@@ -264,6 +316,7 @@ void filter_conn_dump_v4(FilterConnNodeV4 *conn_link, const char *tmpfile) {
     next = conn_link;
     msg = (struct nl_msg_struct *)kmalloc(NL_MSG_SIZE(sizeof(ConnConfig)), GFP_KERNEL);
     if (msg == NULL) {
+        filp_close(fp, NULL);
         return;
     }
     msg->msg_type = NL_MSG_CONF;
