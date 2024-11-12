@@ -13,6 +13,8 @@ enum {
     CONF_RULE_DUMP = 13, // 读取规则输出
     CONF_CONN_CLEAR = 20, // 清除状态表
     CONF_CONN_DUMP = 21, // 读取状态表
+    CONF_NAT_CLEAR = 30, // 清除NAT连接表
+    CONF_NAT_DUMP = 31, // 读取NAT连接表
 };
 
 extern int nl_msg_config_handler(struct nl_msg_struct *msg);
