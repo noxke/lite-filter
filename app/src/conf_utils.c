@@ -31,6 +31,18 @@ static struct config_mutex_cond_struct config_rule_dump_mutex_cond = {
     .cond = PTHREAD_COND_INITIALIZER,
 };
 
+static struct config_mutex_cond_struct config_conn_dump_mutex_cond = {
+    .conf = NULL,
+    .mutex = PTHREAD_MUTEX_INITIALIZER,
+    .cond = PTHREAD_COND_INITIALIZER,
+};
+
+static struct config_mutex_cond_struct config_nat_dump_mutex_cond = {
+    .conf = NULL,
+    .mutex = PTHREAD_MUTEX_INITIALIZER,
+    .cond = PTHREAD_COND_INITIALIZER,
+};
+
 // 消息处理器加锁
 static pthread_mutex_t config_handler_mutex = PTHREAD_MUTEX_INITIALIZER;
 static pthread_cond_t config_handler_cond = PTHREAD_COND_INITIALIZER;
@@ -72,6 +84,36 @@ int nl_msg_config_handler(struct nl_msg_struct *msg) {
             if (config_rule_dump_mutex_cond.conf != NULL) {
                 memcpy(config_rule_dump_mutex_cond.conf, conf, sizeof(RuleConfig));
                 pthread_cond_signal(&(config_rule_dump_mutex_cond.cond));
+                // 1s超时
+                clock_gettime(CLOCK_REALTIME, &ts);
+                ts.tv_sec += 1;
+                if (pthread_cond_timedwait(&config_handler_cond, &config_handler_mutex, &ts) == ETIMEDOUT) {
+                    ret = -1;
+                }
+            }
+            break;
+        case CONF_CONN_CLEAR:
+            break;
+        case CONF_CONN_DUMP:
+            conf = (void *)NL_MSG_DATA(msg);
+            if (config_conn_dump_mutex_cond.conf != NULL) {
+                memcpy(config_conn_dump_mutex_cond.conf, conf, sizeof(ConnConfig));
+                pthread_cond_signal(&(config_conn_dump_mutex_cond.cond));
+                // 1s超时
+                clock_gettime(CLOCK_REALTIME, &ts);
+                ts.tv_sec += 1;
+                if (pthread_cond_timedwait(&config_handler_cond, &config_handler_mutex, &ts) == ETIMEDOUT) {
+                    ret = -1;
+                }
+            }
+            break;
+        case CONF_NAT_CLEAR:
+            break;
+        case CONF_NAT_DUMP:
+            conf = (void *)NL_MSG_DATA(msg);
+            if (config_nat_dump_mutex_cond.conf != NULL) {
+                memcpy(config_nat_dump_mutex_cond.conf, conf, sizeof(NatConfig));
+                pthread_cond_signal(&(config_nat_dump_mutex_cond.cond));
                 // 1s超时
                 clock_gettime(CLOCK_REALTIME, &ts);
                 ts.tv_sec += 1;
@@ -264,6 +306,158 @@ int config_rule_dump(int hook_chain, FILE *fp, int with_index) {
         // 输出规则
         fprintf(fp, "%s\n", conf.rule_str);
         index++;
+    }
+
+    if (dump_fp != NULL) {
+        fclose(dump_fp);
+    }
+    unlink(tmpfile);
+
+    free(msg);
+
+    return ret;
+}
+
+int config_conn_clear() {
+    ConnConfig conf;
+    struct nl_msg_struct *msg;
+    int ret;
+    memset(&conf, 0, sizeof(conf));
+    conf.config_type = CONF_CONN_CLEAR;
+    msg = (struct nl_msg_struct *)malloc(NL_MSG_SIZE(sizeof(ConnConfig)));
+    if (msg == NULL) {
+        return -1;
+    }
+    msg->msg_type = NL_MSG_CONF;
+    msg->msg_size = NL_MSG_SIZE(sizeof(ConnConfig));
+    memcpy(NL_MSG_DATA(msg), &conf, sizeof(ConnConfig));
+    ret = nl_send_msg(msg);
+    free(msg);
+    return ret;
+}
+
+int config_conn_dump() {
+    ConnConfig conf;
+    struct nl_msg_struct *msg;
+    int ret = 0;
+    int index;
+    struct timespec ts;
+    char tmpfile[sizeof(conf.conf_str)];
+    char line_buf[DEFAULT_STR_SIZE+16];
+    FILE *dump_fp;
+
+    // 生成一个随机文件名用于内核传递dump信息
+    clock_gettime(CLOCK_REALTIME, &ts);
+    snprintf(tmpfile, sizeof(tmpfile), "/tmp/.lite-filter-%ld-%ld", ts.tv_sec, ts.tv_nsec);
+    conf.config_type = CONF_CONN_DUMP;
+    strncpy(conf.conf_str, tmpfile, sizeof(conf.conf_str));
+    msg = (struct nl_msg_struct *)malloc(NL_MSG_SIZE(sizeof(ConnConfig)));
+    if (msg == NULL) {
+        return -1;
+    }
+    msg->msg_type = NL_MSG_CONF;
+    msg->msg_size = NL_MSG_SIZE(sizeof(ConnConfig));
+    memcpy(NL_MSG_DATA(msg), &conf, sizeof(ConnConfig));
+
+    // 等待内核返回配置信息
+    pthread_mutex_lock(&(config_conn_dump_mutex_cond.mutex));
+    config_conn_dump_mutex_cond.conf = &conf;
+
+    nl_send_msg(msg);
+
+    // 1s超时
+    clock_gettime(CLOCK_REALTIME, &ts);
+    ts.tv_sec += 1;
+    if (pthread_cond_timedwait(&(config_conn_dump_mutex_cond.cond), &(config_conn_dump_mutex_cond.mutex), &ts) == ETIMEDOUT) {
+        ret = -1;
+    }
+
+    config_conn_dump_mutex_cond.conf = NULL;
+    pthread_cond_signal(&config_handler_cond);
+    pthread_mutex_unlock(&(config_conn_dump_mutex_cond.mutex));
+
+    dump_fp = fopen(tmpfile, "rb");
+    if (dump_fp == NULL) {
+        ret = -1;
+    }
+    while (ret != -1 && fgets(line_buf, sizeof(line_buf), dump_fp) != NULL) {
+        printf("%s", line_buf);
+    }
+
+    if (dump_fp != NULL) {
+        fclose(dump_fp);
+    }
+    unlink(tmpfile);
+
+    free(msg);
+
+    return ret;
+}
+
+int config_nat_clear() {
+    NatConfig conf;
+    struct nl_msg_struct *msg;
+    int ret;
+    memset(&conf, 0, sizeof(conf));
+    conf.config_type = CONF_NAT_CLEAR;
+    msg = (struct nl_msg_struct *)malloc(NL_MSG_SIZE(sizeof(NatConfig)));
+    if (msg == NULL) {
+        return -1;
+    }
+    msg->msg_type = NL_MSG_CONF;
+    msg->msg_size = NL_MSG_SIZE(sizeof(NatConfig));
+    memcpy(NL_MSG_DATA(msg), &conf, sizeof(NatConfig));
+    ret = nl_send_msg(msg);
+    free(msg);
+    return ret;
+}
+
+int config_nat_dump() {
+    NatConfig conf;
+    struct nl_msg_struct *msg;
+    int ret = 0;
+    int index;
+    struct timespec ts;
+    char tmpfile[sizeof(conf.conf_str)];
+    char line_buf[DEFAULT_STR_SIZE+16];
+    FILE *dump_fp;
+
+    // 生成一个随机文件名用于内核传递dump信息
+    clock_gettime(CLOCK_REALTIME, &ts);
+    snprintf(tmpfile, sizeof(tmpfile), "/tmp/.lite-filter-%ld-%ld", ts.tv_sec, ts.tv_nsec);
+    conf.config_type = CONF_NAT_DUMP;
+    strncpy(conf.conf_str, tmpfile, sizeof(conf.conf_str));
+    msg = (struct nl_msg_struct *)malloc(NL_MSG_SIZE(sizeof(NatConfig)));
+    if (msg == NULL) {
+        return -1;
+    }
+    msg->msg_type = NL_MSG_CONF;
+    msg->msg_size = NL_MSG_SIZE(sizeof(NatConfig));
+    memcpy(NL_MSG_DATA(msg), &conf, sizeof(NatConfig));
+
+    // 等待内核返回配置信息
+    pthread_mutex_lock(&(config_nat_dump_mutex_cond.mutex));
+    config_nat_dump_mutex_cond.conf = &conf;
+
+    nl_send_msg(msg);
+
+    // 1s超时
+    clock_gettime(CLOCK_REALTIME, &ts);
+    ts.tv_sec += 1;
+    if (pthread_cond_timedwait(&(config_nat_dump_mutex_cond.cond), &(config_nat_dump_mutex_cond.mutex), &ts) == ETIMEDOUT) {
+        ret = -1;
+    }
+
+    config_nat_dump_mutex_cond.conf = NULL;
+    pthread_cond_signal(&config_handler_cond);
+    pthread_mutex_unlock(&(config_nat_dump_mutex_cond.mutex));
+
+    dump_fp = fopen(tmpfile, "rb");
+    if (dump_fp == NULL) {
+        ret = -1;
+    }
+    while (ret != -1 && fgets(line_buf, sizeof(line_buf), dump_fp) != NULL) {
+        printf("%s", line_buf);
     }
 
     if (dump_fp != NULL) {

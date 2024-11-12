@@ -24,6 +24,8 @@ enum {
     CMD_SAVE = 4,
     CMD_CLEAR = 5,
     CMD_LOG = 6,
+    CMD_CONN = 7,
+    CMD_NAT = 8,
     CMD_CLI_LS = 11,
     CMD_CLI_ADD = 12,
     CMD_CLI_DEL = 13,
@@ -54,6 +56,9 @@ void help() {
     puts("  load [-f /path/to/rule]\n\tload rules from rule file, default stdin");
     puts("  save [-f /path/to/rule]\n\tsave rules to file, default stdout");
     puts("  log [patterns]\n\tshow lite-filter logs");
+
+    puts("  conn [clear]\n\tshow/clear connections");
+    puts("  nat [clear]\n\tshow/clear nat connections");
 
     puts("ls|add|del|clear");
     // ls
@@ -131,6 +136,28 @@ int arg_parser(int argc, char *argv[]) {
             buf_p += strlen(buf_p);
             *buf_p = ' ';
             buf_p++;
+        }
+    }
+    else if (strcmp(argv[1], "conn") == 0) {
+        cmd = CMD_CONN;
+        if (argc >= 3) {
+            if (strcmp(argv[2], "clear") == 0) {
+                strncpy(cmd_buffer, "clear", sizeof(cmd_buffer));
+            }
+            else {
+                return -1;
+            }
+        }
+    }
+    else if (strcmp(argv[1], "nat") == 0) {
+        cmd = CMD_NAT;
+        if (argc >= 3) {
+            if (strcmp(argv[2], "clear") == 0) {
+                strncpy(cmd_buffer, "clear", sizeof(cmd_buffer));
+            }
+            else {
+                return -1;
+            }
         }
     }
     else if (strcmp(argv[1], "ls") == 0) {
@@ -507,6 +534,28 @@ int cmd_log() {
     return 0;
 }
 
+int cmd_conn() {
+    int ret = -1;
+    if (strlen(cmd_buffer) == 0) {
+        ret = config_conn_dump();
+    }
+    else if (strcmp(cmd_buffer, "clear") == 0) {
+        ret = config_conn_clear();
+    }
+    return ret;
+}
+
+int cmd_nat() {
+    int ret = -1;
+    if (strlen(cmd_buffer) == 0) {
+        ret = config_nat_dump();
+    }
+    else if (strcmp(cmd_buffer, "clear") == 0) {
+        ret = config_nat_clear();
+    }
+    return ret;
+}
+
 int cmd_ls() {
     return config_rule_dump(hook_chain, stdout, 1);
 }
@@ -586,6 +635,12 @@ int service_main() {
             break;
         case CMD_LOG:
             ret = cmd_log();
+            break;
+        case CMD_CONN:
+            ret = cmd_conn();
+            break;
+        case CMD_NAT:
+            ret = cmd_nat();
             break;
         case CMD_CLI_LS:
             ret = cmd_ls();

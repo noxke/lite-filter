@@ -94,8 +94,8 @@ int rule_parser(const char *rule_str, RuleConfig *rule) {
     int only_chain = 1;
     char *token;
     char *tmp_token;
-    char str[MAX_RULE_STR_SIZE];
-    char tmp_str[MAX_RULE_STR_SIZE];
+    char str[DEFAULT_STR_SIZE];
+    char tmp_str[DEFAULT_STR_SIZE];
     if (rule == NULL || rule_str == NULL || strlen(rule_str) <= 0) {
         return -1;
     }

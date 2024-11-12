@@ -17,6 +17,10 @@ enum {
     CONF_RULE_INSERT = 11,   // 添加规则
     CONF_RULE_REMOVE = 12,   // 移除规则
     CONF_RULE_DUMP = 13, // 读取规则输出
+    CONF_CONN_CLEAR = 20, // 清除连接表
+    CONF_CONN_DUMP = 21, // 读取连接表
+    CONF_NAT_CLEAR = 30, // 清除NAT连接表
+    CONF_NAT_DUMP = 31, // 读取NAT连接表
 };
 
 #define LOG_FILENAME_SIZE 256
@@ -35,4 +39,10 @@ int config_rule_clear(int hook_chain);
 int config_rule_insert(RuleConfig *conf, int index);
 int config_rule_remove(int hook_chain, int index);
 int config_rule_dump(int hook_chain, FILE *fp, int with_index);
+
+int config_conn_clear();
+int config_conn_dump();
+
+int config_nat_clear();
+int config_nat_dump();
 #endif // __CONF_UTILS_H__
