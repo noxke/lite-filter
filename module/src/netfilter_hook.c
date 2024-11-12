@@ -46,7 +46,12 @@ unsigned int hook_prerouting_func(void *priv, struct sk_buff *skb, const struct 
     up_read(&nf_hook_conn_rwsem);
     // 匹配成功则直接放行报文
     if (matched_conn != NULL) {
-        return NF_ACCEPT;
+        if (matched_conn == CONN_DROP) {
+            return NF_DROP;
+        }
+        else {
+            return NF_ACCEPT;
+        }
     }
 
     // 获取读sem
@@ -244,7 +249,12 @@ unsigned int hook_postrouting_func(void *priv, struct sk_buff *skb, const struct
     up_read(&nf_hook_conn_rwsem);
     // 匹配成功则直接放行报文
     if (matched_conn != NULL) {
-        return NF_ACCEPT;
+        if (matched_conn == CONN_DROP) {
+            return NF_DROP;
+        }
+        else {
+            return NF_ACCEPT;
+        }
     }
 
     // 获取读sem
@@ -284,7 +294,7 @@ struct nf_hook_table_struct nf_hook_table[NF_HOOK_MAX] = {
             .hook = hook_prerouting_func,
             .pf = PF_INET,
             .hooknum = NF_INET_PRE_ROUTING,
-            .priority = NF_IP_PRI_FIRST,
+            .priority = NF_HOOK_PRIORITY,
         },
     },
     {
@@ -293,7 +303,7 @@ struct nf_hook_table_struct nf_hook_table[NF_HOOK_MAX] = {
             .hook = hook_input_func,
             .pf = PF_INET,
             .hooknum = NF_INET_LOCAL_IN,
-            .priority = NF_IP_PRI_FIRST,
+            .priority = NF_HOOK_PRIORITY,
         },
     },
     {
@@ -302,7 +312,7 @@ struct nf_hook_table_struct nf_hook_table[NF_HOOK_MAX] = {
             .hook = hook_forward_func,
             .pf = PF_INET,
             .hooknum = NF_INET_FORWARD,
-            .priority = NF_IP_PRI_FIRST,
+            .priority = NF_HOOK_PRIORITY,
         },
     },
     {
@@ -311,7 +321,7 @@ struct nf_hook_table_struct nf_hook_table[NF_HOOK_MAX] = {
             .hook = hook_output_func,
             .pf = PF_INET,
             .hooknum = NF_INET_LOCAL_OUT,
-            .priority = NF_IP_PRI_FIRST,
+            .priority = NF_HOOK_PRIORITY,
         },
     },
     {
@@ -320,7 +330,7 @@ struct nf_hook_table_struct nf_hook_table[NF_HOOK_MAX] = {
             .hook = hook_postrouting_func,
             .pf = PF_INET,
             .hooknum = NF_INET_POST_ROUTING,
-            .priority = NF_IP_PRI_FIRST,
+            .priority = NF_HOOK_PRIORITY,
         },
     },
     {

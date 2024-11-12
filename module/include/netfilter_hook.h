@@ -7,6 +7,10 @@
 #include <linux/semaphore.h>
 #include "filter_rule_utils.h"
 
+// 由于测试使用docker网络，优先级需要低于docker的优先级，否则存在报文重复
+// #define NF_HOOK_PRIORITY NF_IP_PRI_FIRST
+#define NF_HOOK_PRIORITY NF_IP_PRI_LAST
+
 struct nf_hook_table_struct {
     FilterNodeV4 *rule_link;
     struct rw_semaphore rw_sem;      // 信号量，用于避免读时写
