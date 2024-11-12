@@ -9,12 +9,15 @@
 
 struct nf_hook_table_struct {
     FilterNodeV4 *rule_link;
-    FilterStatusNodeV4 *status_link;
-    FilterNatNodeV4 *nat_link;
     struct rw_semaphore rw_sem;      // 信号量，用于避免读时写
     const char *chain_name;
     struct nf_hook_ops ops;
 };
+
+extern FilterConnNodeV4 *nf_hook_conn_link;
+extern struct rw_semaphore nf_hook_conn_rwsem;
+extern FilterNatNodeV4 *nf_hook_nat_link;
+extern struct rw_semaphore nf_hook_nat_rwsem;
 
 extern struct nf_hook_table_struct nf_hook_table[NF_HOOK_MAX];
 

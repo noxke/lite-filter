@@ -4,9 +4,12 @@
 
 #define MAX_RULE_STR_SIZE 256
 // 默认过期时间300s
-#define DEFAULT_EXPIRE 300
+#define EXPIRE_TIME 300
+// 默认更新时间5000ms
+#define UPDATE_TIME 5000
 
 typedef unsigned char u8;
+typedef unsigned long long u64;
 
 enum NL_HOOK_CHAIN {
     NF_HOOK_NONE = 0,
@@ -36,6 +39,21 @@ enum FILTER_RULES_TYPE {
     FILTER_SNAT = 3,    // 原NAT转换
     FILTER_DNAT = 4,    // 目的NAT转换
     FILTER_MAX = 5,
+};
+
+// 连接状态枚举
+enum FILTER_STATUS_ENUM {
+    FILTER_STATUS_NONE = 0,
+    FILTER_STATUS_ICMP = 1,
+    FILTER_STATUS_UDP = 2,
+    FILTER_STATUS_TCP_CLOSED = 10,
+    FILTER_STATUS_TCP_SYN_SENT = 11,
+    FILTER_STATUS_TCP_SYN_RECEIVED = 12,
+    FILTER_STATUS_TCP_ESTABLISHED = 13,
+    FILTER_STATUS_TCP_FIN_WAIT = 14,
+    FILTER_STATUS_TCP_CLOSE_WAIT = 15,
+    FILTER_STATUS_TCP_LAST_ACK = 16,
+    FILTER_STATUS_TCP_TIME_WAIT = 17,
 };
 
 typedef struct {
@@ -77,19 +95,24 @@ typedef struct _FilterNodeV4 {
     struct _FilterNodeV4 *next;
 } FilterNodeV4;
 
-typedef struct _FilterStatusNodeV4 {
+typedef struct {
+    int config_type;
+    char conf_str[MAX_RULE_STR_SIZE];
+} ConnConfig;
+
+typedef struct _FilterConnNodeV4 {
     IpPackInfoV4 ip_info;
     unsigned char protocol;
     unsigned char status;
-    int expire;
-    struct _FilterStatusNodeV4 *next;
-} FilterStatusNodeV4;
+    u64 expire_time;
+    struct _FilterConnNodeV4 *next;
+} FilterConnNodeV4;
 
 typedef struct _FilterNatNodeV4 {
     IpPackInfoV4 ip_info;
     __be32 nataddr;
     __be16 natport;
-    int expire;
+    u64 expire_time;
     struct _FilterNatNodeV4 *next;
 } FilterNatNodeV4;
 
