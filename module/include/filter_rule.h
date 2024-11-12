@@ -2,7 +2,7 @@
 #define __FILTER_RULE_H__
 // 过滤器规则接口
 
-#define MAX_RULE_STR_SIZE 256
+#define DEFAULT_STR_SIZE 256
 // 默认过期时间300s
 #define EXPIRE_TIME 300
 // 默认更新时间5000ms
@@ -87,7 +87,7 @@ typedef struct {
     int hook_chain;
     int index;
     FilterRuleV4 rule;
-    char rule_str[MAX_RULE_STR_SIZE];
+    char rule_str[DEFAULT_STR_SIZE];
 } RuleConfig;
 
 typedef struct _FilterNodeV4 {
@@ -97,7 +97,7 @@ typedef struct _FilterNodeV4 {
 
 typedef struct {
     int config_type;
-    char conf_str[MAX_RULE_STR_SIZE];
+    char conf_str[DEFAULT_STR_SIZE];
 } ConnConfig;
 
 typedef struct _FilterConnNodeV4 {
@@ -107,6 +107,11 @@ typedef struct _FilterConnNodeV4 {
     u64 expire_time;
     struct _FilterConnNodeV4 *next;
 } FilterConnNodeV4;
+
+typedef struct {
+    int config_type;
+    char conf_str[DEFAULT_STR_SIZE];
+} NatConfig;
 
 typedef struct _FilterNatNodeV4 {
     IpPackInfoV4 ip_info;
