@@ -1,0 +1,50 @@
+version: '3'
+services:
+  # 模拟内网主机
+  intra-host:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: intra-host
+    volumes:
+      - .:/test
+    networks:
+      litefilter0:
+        ipv4_address: 172.168.0.2
+    privileged: true
+    restart: always
+
+  # 模拟公网主机
+  extra-host:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: extra-host
+    volumes:
+      - .:/test
+    networks:
+      litefilter1:
+        ipv4_address: 11.0.0.2
+    privileged: true
+    restart: always
+ 
+networks:
+  # 模拟内网网络
+  litefilter0:
+    name: litefilter0
+    driver: bridge
+    driver_opts:
+      com.docker.network.bridge.name: litefilter0
+    ipam:
+      config:
+        - subnet: 172.168.0.0/24
+
+  # 模拟公网网络
+  litefilter1:
+    name: litefilter1
+    driver: bridge
+    driver_opts:
+      com.docker.network.bridge.name: litefilter1
+    ipam:
+      config:
+        - subnet: 11.0.0.0/8
