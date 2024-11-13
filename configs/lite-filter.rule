@@ -1,0 +1,16 @@
+# PREROUTING规则
+
+# 接受默认报文
+[PREROUTING] -r ACCEPT
+
+
+# POSTROUTING规则
+
+# 接受默认所有报文
+[POSTROUTING] -r ACCEPT
+
+
+# NAT规则
+# SNAT
+
+# DNAT
