@@ -390,6 +390,10 @@ int rule_parser(const char *rule_str, RuleConfig *rule) {
         if((rule->rule.match_flags & FILTER_MATCH_OUTDEV) == 0) {
             ret = -1;
         }
+        // 只支持UDP与TCP
+        if ((rule->rule.match_flags & FILTER_MATCH_PROTO) == 0 || (rule->rule.protocol != IPPROTO_UDP && rule->rule.protocol != IPPROTO_TCP)) {
+            ret = -1;
+        }
     }
     // DNAT
     if (rule->rule.rule_type == FILTER_DNAT) {
@@ -399,6 +403,10 @@ int rule_parser(const char *rule_str, RuleConfig *rule) {
         }
         // 需要indev
         if ((rule->rule.match_flags & FILTER_MATCH_INDEV) == 0) {
+            ret = -1;
+        }
+        // 只支持UDP与TCP
+        if ((rule->rule.match_flags & FILTER_MATCH_PROTO) == 0 || (rule->rule.protocol != IPPROTO_UDP && rule->rule.protocol != IPPROTO_TCP)) {
             ret = -1;
         }
     }

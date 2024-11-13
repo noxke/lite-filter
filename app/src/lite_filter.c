@@ -83,9 +83,9 @@ void help() {
 
     puts("SNAT|DNAT:");
     puts("  -r SNAT[:10.0.0.1[:1234]]");
-    puts("\tSNAT is only available in NAT, outdev is must");
+    puts("\tSNAT is only available in NAT, outdev is must, support UDP and TCP");
     puts("  -r DNAT[:10.0.0.1[:1234]]");
-    puts("\tDNAT is only available in NAT, indev is must");
+    puts("\tDNAT is only available in NAT, indev is must, support UDP and TCP");
     exit(0);
 }
 
