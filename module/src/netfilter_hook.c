@@ -12,6 +12,7 @@
 #include "netfilter_hook.h"
 #include "filter_rule_utils.h"
 #include "filter_conn_utils.h"
+#include "filter_nat_utils.h"
 
 // Hook function for PREROUTING chain
 unsigned int hook_prerouting_func(void *priv, struct sk_buff *skb, const struct nf_hook_state *state) {
@@ -20,6 +21,7 @@ unsigned int hook_prerouting_func(void *priv, struct sk_buff *skb, const struct 
     IpPackInfoV4 info;
     RuleConfig *matched_rule;
     FilterConnNodeV4 *matched_conn;
+    FilterNatNodeV4 *matched_nat;
     int action = NF_ACCEPT;
 
     memset(&info, 0, sizeof(info));
@@ -38,7 +40,38 @@ unsigned int hook_prerouting_func(void *priv, struct sk_buff *skb, const struct 
         info.outdev = -1;
     }
 
-    // 先在状态表内进行匹配
+    // nat连接匹配
+    down_read(&nf_hook_nat_rwsem);
+    // 检查nat连接是否存在
+    matched_nat = filter_nat_match_v4(&info, skb);
+    // 检查是否为反向回应报文
+    if (matched_nat == NULL) {
+        matched_nat = filter_nat2_match_v4(&info, skb);
+    }
+    up_read(&nf_hook_nat_rwsem);
+
+    // nat连接未匹配则检查nat规则
+    if (matched_nat == NULL) {
+        down_read(&(nf_hook_table[NF_HOOK_NAT].rw_sem));
+        
+        // 匹配NAT链表
+        matched_rule = filter_rule_match_v4(nf_hook_table[NF_HOOK_NAT].rule_link, &info);
+        if (matched_rule != NULL && matched_rule->rule.rule_type == FILTER_DNAT && matched_rule->rule.match_flags != 0) {
+            filter_rule_matched_log(matched_rule, &info);
+            down_write(&nf_hook_nat_rwsem);
+            // 添加DNAT连接
+            filter_nat_insert_v4(&(matched_rule->rule), &info, skb);
+            up_write(&nf_hook_nat_rwsem);
+        }
+
+        up_read(&(nf_hook_table[NF_HOOK_NAT].rw_sem));
+    }
+    // NAT匹配成功后不继续匹配
+    if (matched_nat != NULL || matched_rule != NULL) {
+        return NF_ACCEPT;
+    }
+
+    // 在状态表内进行匹配
     // 获取读sem
     down_read(&nf_hook_conn_rwsem);
     matched_conn = filter_conn_match_v4(&info, skb);
@@ -223,6 +256,7 @@ unsigned int hook_postrouting_func(void *priv, struct sk_buff *skb, const struct
     IpPackInfoV4 info;
     RuleConfig *matched_rule;
     FilterConnNodeV4 *matched_conn;
+    FilterNatNodeV4 *matched_nat;
     int action = NF_ACCEPT;
 
     memset(&info, 0, sizeof(info));
@@ -241,7 +275,38 @@ unsigned int hook_postrouting_func(void *priv, struct sk_buff *skb, const struct
         info.outdev = -1;
     }
 
-    // 先在状态表内进行匹配
+    // nat连接匹配
+    down_read(&nf_hook_nat_rwsem);
+    // 检查nat连接是否存在
+    matched_nat = filter_nat_match_v4(&info, skb);
+    // 检查是否为反向回应报文
+    if (matched_nat == NULL) {
+        matched_nat = filter_nat2_match_v4(&info, skb);
+    }
+    up_read(&nf_hook_nat_rwsem);
+
+    // nat连接未匹配则检查nat规则
+    if (matched_nat == NULL) {
+        down_read(&(nf_hook_table[NF_HOOK_NAT].rw_sem));
+
+        // 匹配NAT链表
+        matched_rule = filter_rule_match_v4(nf_hook_table[NF_HOOK_NAT].rule_link, &info);
+        if (matched_rule != NULL && matched_rule->rule.rule_type == FILTER_SNAT && matched_rule->rule.match_flags != 0) {
+            filter_rule_matched_log(matched_rule, &info);
+            down_write(&nf_hook_nat_rwsem);
+            // 添加DNAT连接
+            filter_nat_insert_v4(&(matched_rule->rule), &info, skb);
+            up_write(&nf_hook_nat_rwsem);
+        }
+
+        up_read(&(nf_hook_table[NF_HOOK_NAT].rw_sem));
+    }
+    // NAT匹配成功后不继续匹配
+    if (matched_nat != NULL || matched_rule != NULL) {
+        return NF_ACCEPT;
+    }
+
+    // 在状态表内进行匹配
     // 获取读sem
     down_read(&nf_hook_conn_rwsem);
     matched_conn = filter_conn_match_v4(&info, skb);
@@ -342,7 +407,8 @@ FilterConnNodeV4 *nf_hook_conn_link;
 struct rw_semaphore nf_hook_conn_rwsem;
 FilterNatNodeV4 *nf_hook_nat_link;
 struct rw_semaphore nf_hook_nat_rwsem;
-static struct timer_list status_update_timer;
+static struct timer_list conn_update_timer;
+static struct timer_list nat_update_timer;
 
 int nf_hook_init() {
     int i;
@@ -361,15 +427,18 @@ int nf_hook_init() {
         nf_register_net_hook(&init_net, &(nf_hook_table[i].ops));
     }
     // 创建状态更新任务
-    timer_setup(&status_update_timer, filter_conn_updater, 0);
-    mod_timer(&status_update_timer, jiffies + msecs_to_jiffies(UPDATE_TIME));
+    timer_setup(&conn_update_timer, filter_conn_updater, 0);
+    mod_timer(&conn_update_timer, jiffies + msecs_to_jiffies(UPDATE_TIME));
+    timer_setup(&nat_update_timer, filter_nat_updater, 0);
+    mod_timer(&nat_update_timer, jiffies + msecs_to_jiffies(UPDATE_TIME));
     return 0;
 }
 
 void nf_hook_exit() {
     int i;
     // 销毁状态更新任务
-    del_timer(&status_update_timer);
+    del_timer(&nat_update_timer);
+    del_timer(&conn_update_timer);
     // 卸载钩子
     for (i = NF_HOOK_NONE+1; i < NF_HOOK_NAT; i++) {
         nf_unregister_net_hook(&init_net, &(nf_hook_table[i].ops));
