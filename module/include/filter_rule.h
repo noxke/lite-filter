@@ -115,6 +115,8 @@ typedef struct {
 
 typedef struct _FilterNatNodeV4 {
     IpPackInfoV4 ip_info;
+    unsigned char protocol;
+    unsigned int nat_type;
     __be32 nataddr;
     __be16 natport;
     u64 expire_time;

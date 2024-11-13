@@ -97,6 +97,12 @@ void filter_rule_matched_log(RuleConfig *matched_rule, IpPackInfoV4 *info) {
     else if (matched_rule->rule.rule_type == FILTER_DROP) {
         action = "DROP";
     }
+    else if (matched_rule->rule.rule_type == FILTER_SNAT) {
+        action = "SNAT";
+    }
+    else if (matched_rule->rule.rule_type == FILTER_DNAT) {
+        action = "DNAT";
+    }
     else {
         return;
     }

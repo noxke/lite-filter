@@ -7,6 +7,7 @@
 #include "log_utils.h"
 #include "filter_rule_utils.h"
 #include "filter_conn_utils.h"
+#include "filter_nat_utils.h"
 
 #include "module_utils.h"
 
@@ -27,6 +28,10 @@ int nl_msg_config_handler(struct nl_msg_struct *msg) {
         case CONF_CONN_CLEAR:
         case CONF_CONN_DUMP:
             filter_conn_config((ConnConfig *)conf);
+            break;
+        case CONF_NAT_CLEAR:
+        case CONF_NAT_DUMP:
+            filter_nat_config((NatConfig *)conf);
             break;
     }
     return 0;
