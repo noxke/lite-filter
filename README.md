@@ -306,8 +306,8 @@ intra-host: 172.168.0.2 (with default route 172.168.0.1)
 - DNAT 端口映射，将内网主机端口映射到外网
   
   ```python
-  [NAT] -i litefilter1 -p TCP -s 11.0.0.0/8 -d 11.0.0.1:1234 -r DNAT:172.168.0.2:5555
-  [NAT] -i litefilter1 -p UDP -s 11.0.0.0/8 -d 11.0.0.1:1234 -r DNAT:172.168.0.2:5555
+  [NAT] -i litefilter1 -p UDP -s 11.0.0.0/8 -d 11.0.0.1:4002 -r DNAT:172.168.0.2:4002
+  [NAT] -i litefilter1 -p TCP -s 11.0.0.0/8 -d 11.0.0.1:5002 -r DNAT:172.168.0.2:5002
   ```
 
 - NAT测试
