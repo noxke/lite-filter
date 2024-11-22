@@ -245,7 +245,7 @@ int config_rule_dump(int hook_chain, FILE *fp, int with_index) {
     RuleConfig conf;
     struct nl_msg_struct *msg;
     int ret = 0;
-    int index;
+    int index = 0;
     struct timespec ts;
     char tmpfile[sizeof(conf.rule_str)];
     FILE *dump_fp;
