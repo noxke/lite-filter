@@ -27,7 +27,7 @@ def test_icmp(src, dst):
     reply = sr1(packet, timeout=1, verbose=False)
     del_ip(src)
     if reply is None:
-        print("[ICMP]o N Reply")
+        print("[ICMP] No Reply")
 
 
 if __name__ == "__main__":
